@@ -3,7 +3,7 @@
   "packages": {
     "specifiers": {
       "jsr:@std/assert@0.222.0": "jsr:@std/assert@0.222.0",
-      "jsr:@std/fmt@^0.222.0": "jsr:@std/fmt@0.222.1",
+      "jsr:@std/fmt@^0.222.0": "jsr:@std/fmt@0.222.0",
       "jsr:@std/testing@0.222.0": "jsr:@std/testing@0.222.0"
     },
     "jsr": {
@@ -13,8 +13,8 @@
           "jsr:@std/fmt@^0.222.0"
         ]
       },
-      "@std/fmt@0.222.1": {
-        "integrity": "ec3382f9b0261c1ab1a5c804aa355d816515fa984cdd827ed32edfb187c0a722"
+      "@std/fmt@0.222.0": {
+        "integrity": "0eb99babf1cc697d67e76e8753916c037bbc3ce4abcefa321e1465708b0adda1"
       },
       "@std/testing@0.222.0": {
         "integrity": "a6d10c9fbb1df052ad7f73174d511328c08b7408bdd162ef6c3bc04def49c2ae"
@@ -36,8 +36,6 @@
       "jsr:@std/bytes",
       "jsr:@std/jsoc@0.222.x",
       "jsr:@std/testing@0.222.0",
-      "jsr:@std/testing@^0.222.0",
-      "jsr:@std/yaml@123.456.789",
       "npm:@octokit/core@6.1.0"
     ]
   }
