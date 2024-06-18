@@ -1,0 +1,47 @@
+{
+  version: "3",
+  packages: {
+    specifiers: {
+      "jsr:@std/assert@0.222.0": "jsr:@std/assert@0.222.0",
+      "jsr:@std/assert@0.226.0": "jsr:@std/assert@0.226.0",
+      "jsr:@std/fmt@^0.222.0": "jsr:@std/fmt@0.222.0",
+      "jsr:@std/internal@^1.0.0": "jsr:@std/internal@1.0.0",
+      "jsr:@std/testing@^0.222.0": "jsr:@std/testing@0.222.1"
+    },
+    jsr: {
+      "@std/assert@0.226.0": {
+        integrity: "0dfb5f7c7723c18cec118e080fec76ce15b4c31154b15ad2bd74822603ef75b3",
+        dependencies: [ "jsr:@std/internal@^1.0.0" ]
+      },
+      "@std/internal@1.0.0": {
+        integrity: "ac6a6dfebf838582c4b4f61a6907374e27e05bedb6ce276e0f1608fe84e7cd9a"
+      },
+      "@std/testing@0.222.0": {
+        integrity: "a6d10c9fbb1df052ad7f73174d511328c08b7408bdd162ef6c3bc04def49c2ae"
+      },
+      "@std/testing@0.222.1": {
+        integrity: "7be5c3ef185d31883116824a2dd604eb6f12a56fd5ed80489c7c696b2a76c5bc"
+      }
+    }
+  },
+  remote: {
+    "https://deno.land/x/deno_graph@0.69.6/deno_graph_wasm.generated.js": "db34a2f6e33c4dda6b60bdd1a698babd9593a6d042757949d773b72662a45520",
+    "https://deno.land/x/deno_graph@0.69.6/loader.ts": "512a406cb4c449b45110f2b878cd09929a883a4af193060232d2d9fc76a9d4dd",
+    "https://deno.land/x/deno_graph@0.69.6/media_type.ts": "7c1c5c6654e3cf84b8daa53c0d1ffc1b7864849406f559b961eccff859b0a417",
+    "https://deno.land/x/deno_graph@0.69.6/mod.ts": "be92f206bb38138ffc1c81a0b607dc22bb3a1dd9159b05331b2b37200ba25039",
+    "https://deno.land/x/deno_graph@0.69.6/types.ts": "bde84cb2919068c07e6cf4d8bf3054e8da908f2f221623d5302380df29b96320",
+    "https://deno.land/x/dir@1.5.1/data_local_dir/mod.ts": "91eb1c4bfadfbeda30171007bac6d85aadacd43224a5ed721bbe56bc64e9eb66",
+    "https://deno.land/x/wasmbuild@0.15.1/cache.ts": "9d01b5cb24e7f2a942bbd8d14b093751fa690a6cde8e21709ddc97667e6669ed",
+    "https://deno.land/x/wasmbuild@0.15.1/loader.ts": "8c2fc10e21678e42f84c5135d8ab6ab7dc92424c3f05d2354896a29ccfd02a63"
+  },
+  workspace: {
+    dependencies: [
+      "jsr:@std/assert@0.222.0",
+      "jsr:@std/bytes",
+      "jsr:@std/jsoc@0.222.x",
+      "jsr:@std/testing@0.222.0",
+      "jsr:@std/testing@^0.222.0",
+      "npm:@octokit/core@6.1.0"
+    ]
+  }
+}

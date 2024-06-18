@@ -27,6 +27,7 @@ import {
   CommandError,
   createLockPart,
   type LockFile,
+  type LockFileJson,
   type LockPart,
   readLockFile,
 } from "./lockfile.ts";
@@ -58,6 +59,7 @@ export interface DependencyUpdate<
     span: T extends "module" ? NonNullable<DependencyJson["code"]>["span"]
       : undefined;
   };
+  lock: T extends "lockfile" ? LockFileJson : undefined;
   /**
    * Information about the import map used to resolve the dependency.
    */
@@ -67,8 +69,10 @@ export interface DependencyUpdate<
       source: string;
     } & ImportMapResolveResult<true>
     : undefined;
-  /** The full path to the module that imports the dependency.
-   * @example "/path/to/mod.ts" */
+  /**
+   * The full path to the module that imports the dependency.
+   * @example "/path/to/mod.ts"
+   */
   referrer: string;
 }
 
@@ -306,7 +310,7 @@ async function collectFromDependency(
       ...none,
       updates: await collectUpdateFromLockFile(
         options.lockFile,
-        await createLockPart(resolved),
+        resolved,
       ),
     };
   }
@@ -330,12 +334,21 @@ async function collectFromDependency(
       span,
     },
     map: mapped ? { source: options.importMap!.path, ...mapped } : undefined,
+    lock: undefined,
     referrer: toPath(referrer),
   }];
   if (options.lockFile) {
     updates.push({
       ...update,
       code: { specifier: resolved, span: undefined },
+      lock: (await createLockPart(
+        resolved,
+        null,
+        resolved.replace(
+          stringify(update.from),
+          stringify(update.to),
+        ),
+      )).data,
       map: undefined,
       referrer: options.lockFile.path,
     });
@@ -379,7 +392,7 @@ async function collectFromImportMapEntry(
       ...none,
       updates: await collectUpdateFromLockFile(
         options.lockFile,
-        await createLockPart(mapTo),
+        mapTo,
       ),
     };
   }
@@ -399,6 +412,7 @@ async function collectFromImportMapEntry(
       specifier: mapTo,
       span: undefined,
     },
+    lock: undefined,
     map: {
       source: toPath(path),
       resolved: mapTo,
@@ -411,6 +425,14 @@ async function collectFromImportMapEntry(
     updates.push({
       ...update,
       code: { specifier: mapTo, span: undefined },
+      lock: (await createLockPart(
+        mapTo,
+        null,
+        mapTo.replace(
+          stringify(update.from),
+          stringify(update.to),
+        ),
+      )).data,
       map: undefined,
       referrer: options.lockFile.path,
     });

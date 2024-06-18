@@ -2,9 +2,9 @@
   "version": "3",
   "packages": {
     "specifiers": {
-      "jsr:@std/assert@0.222.0": "jsr:@std/assert@0.222.0",
+      "jsr:@std/assert@^0.222.0": "jsr:@std/assert@0.222.0",
       "jsr:@std/fmt@^0.222.0": "jsr:@std/fmt@0.222.0",
-      "jsr:@std/testing@0.222.0": "jsr:@std/testing@0.222.0"
+      "jsr:@std/testing@^0.222.0": "jsr:@std/testing@0.222.0"
     },
     "jsr": {
       "@std/assert@0.222.0": {

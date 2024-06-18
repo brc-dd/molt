@@ -8,12 +8,8 @@
     "@std/bytes": "jsr:@std/bytes",
     // JSR - variable
     "@std/jsonc": "jsr:@std/jsoc@0.222.x",
-    // JSR - caret
-    "@std/testing": "jsr:@std/testing@^0.222.0",
-    // JSR - extended mapping
-    "@std/testing/bdd": "jsr:@std/testing@0.222.0/bdd",
-    // JSR - updated
-    "@std/yaml": "jsr:@std/yaml@123.456.789",
+    // JSR - duplicated
+    "@std/testing": "jsr:@std/testing@0.222.0",
     // Local
     "lib/": "./lib/",
     // HTTP
@@ -21,6 +17,8 @@
     // HTTP - prefix
     "std/": "https://deno.land/std@0.222.0/",
     // HTTP - unversioned
-    "std/assert": "https://deno.land/std/assert/mod.ts"
+    "std/assert": "https://deno.land/std/assert/mod.ts",
+    // HTTP - updated
+    "std/yaml": "https://deno.land/std@0.224.0/yaml/mod.ts"
   }
 }

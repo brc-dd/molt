@@ -4,12 +4,13 @@ import { assertEquals } from "@std/assert";
 import {
   deepMerge,
   distinctBy,
-  mapNotNullish as mapN,
+  filterEntries,
+  mapNotNullish,
   omit,
   partition,
 } from "@std/collections";
 import { detect as detectEOL, EOL } from "@std/fs/eol";
-import { parse, stringify, type UpdatedDependency } from "./dependency.ts";
+import { parse, type UpdatedDependency } from "./dependency.ts";
 import type { FileUpdate } from "./file.ts";
 import type { DependencyUpdate } from "./update.ts";
 
@@ -184,9 +185,15 @@ export async function createLockPart(
   if (code !== 0) {
     throw new CommandError(new TextDecoder().decode(stderr));
   }
+  const data = parseLockFileJson(await Deno.readTextFile(lock.path));
+  if (locked) {
+    data.packages!.specifiers[dependency] =
+      data.packages!.specifiers[specifier];
+    delete data.packages!.specifiers[specifier];
+  }
   return {
     specifier: dependency,
-    data: parseLockFileJson(await Deno.readTextFile(lock.path)),
+    data,
   };
 }
 
@@ -209,41 +216,73 @@ export async function createLockPartForEach(
 }
 
 /**
+ * Extract a partial lock file for a dependency from a lock file.
+ *
+ * @param dependency - The import specifier of the dependency.
+ * @param lock - The lockfile to create a partial lock from.
+ */
+export async function extractLockPart(
+  dependency: string,
+  lockfile: LockFile,
+): Promise<LockPart> {
+  const specifier = lockfile.data.packages?.specifiers[dependency];
+  if (!specifier) {
+    throw new Error(`${dependency} not found in ${lockfile.path}`);
+  }
+  const lock = await createLockPart(specifier);
+  console.log(lock);
+
+  const deps = Object.keys(lock.data.packages?.specifiers ?? {})
+    .filter((it) => !it.startsWith(specifier));
+  console.log(deps);
+
+  for (const dep of deps) {
+    const lock = await extractLockPart(dep, lockfile);
+    console.log(lock);
+  }
+
+  return lock;
+}
+
+/**
  * Collect updates to dependencies in the given lockfile.
  *
  * @param original - The LockFile object for the original lockfile.
- * @param patches - The LockFile objects for dependencies being updated.
+ * @param targets - The specifiers of dependencies being updated.
  * @returns The collected updates to dependencies.
  */
 export async function collectUpdateFromLockFile(
   original: LockFile,
-  ...patches: LockPart[]
+  ...targets: string[]
 ): Promise<DependencyUpdate<"lockfile">[]> {
-  patches = patches.length ? patches : await createLockPartForEach(original);
-  return distinctBy(
-    patches.flatMap(
-      (patch: LockPart) =>
-        mapN(
-          Object.entries(patch.data.packages?.specifiers ?? {}),
-          ([specifier, locking]): DependencyUpdate | undefined => {
-            const locked = original.data.packages?.specifiers[specifier];
-            if (locked !== locking) {
-              return {
-                from: locked ? parse(locked) : undefined,
-                to: parse(locking) as UpdatedDependency,
-                code: {
-                  specifier,
-                  span: undefined,
-                },
-                referrer: original.path,
-                map: undefined,
-              };
-            }
-          },
-        ),
-    ),
-    (update) => update.to.name,
-  ).sort((a, b) => a.to.name.localeCompare(b.to.name));
+  const patches = targets.length
+    ? await Promise.all(targets.map((it) => createLockPart(it)))
+    : await createLockPartForEach(original);
+  const updates: DependencyUpdate<"lockfile">[] = patches.flatMap((patch) =>
+    mapNotNullish(
+      Object.entries(patch.data.packages?.specifiers ?? {}),
+      ([specifier, locking]) => {
+        const locked = original.data.packages?.specifiers[specifier];
+        if (locked !== locking) {
+          return {
+            from: locked ? parse(locked) : undefined,
+            to: parse(locking) as UpdatedDependency,
+            code: {
+              // TODO: Is it justified to use the specifier of the patch here?
+              specifier: patch.specifier,
+              span: undefined,
+            },
+            // TODO: Is it justified to use the whole patch here?
+            lock: patch.data,
+            map: undefined,
+            referrer: original.path,
+          };
+        }
+      },
+    )
+  );
+  return distinctBy(updates, (update) => update.to.name)
+    .sort((a, b) => a.to.name.localeCompare(b.to.name));
 }
 
 /** Write the given lockfile update to the lockfile. */
@@ -253,23 +292,17 @@ export async function writeToLockfile(
   const content = await Deno.readTextFile(update.path);
   const original = parseLockFileJson(content);
 
-  for await (const dependency of update.dependencies) {
+  for (const dependency of update.dependencies) {
     const specifier = dependency.code.specifier;
+    console.log(specifier);
 
     // An updated partial lockfile for the dependency.
-    const { data: patch } = await createLockPart(
-      specifier,
-      null,
-      dependency.from?.protocol.startsWith("http")
-        ? specifier.replace(
-          stringify(dependency.from),
-          stringify(dependency.to),
-        )
-        : undefined,
-    );
+    const patch = dependency.lock;
+    console.log(patch);
 
-    // Specifiers that are only depended by the current dependency.
+    /** Specifiers that are only depended by the current dependency. */
     const omitter = createLockFileOmitKeys(specifier, update.locks);
+    console.log(omitter);
 
     if (original.packages && patch.packages) {
       original.packages.specifiers = deepMerge(
@@ -327,7 +360,7 @@ function createLockFileOmitKeys(
     locks,
     (it) => it.specifier === specifier,
   );
-  assertEquals(relevant.length, 1);
+  assertEquals(relevant.length, 1, specifier);
   const { data: patch } = relevant[0];
   return {
     jsr: Object.keys(patch.packages?.jsr ?? {}).filter((key) =>

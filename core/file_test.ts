@@ -122,3 +122,30 @@ describe("write", () => {
     );
   });
 });
+
+describe.only("write - lockfile", () => {
+  let cwd: string;
+
+  beforeEach(() => {
+    cwd = Deno.cwd();
+    Deno.chdir(new URL("../test/fixtures", import.meta.url));
+    fs.stub(".");
+    fs.mock();
+  });
+
+  afterEach(() => {
+    fs.dispose();
+    Deno.chdir(cwd);
+  });
+
+  it("mod_test.ts", async () => {
+    const result = await collect("mod_test.ts", {
+      lock: true,
+      lockFile: "deno.lock",
+    });
+    console.log(result);
+    await write(result);
+    const actual = await Deno.readTextFile("deno.lock");
+    console.log(actual);
+  });
+});

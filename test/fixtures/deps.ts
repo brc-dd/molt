@@ -10,20 +10,14 @@ import "jsr:@std/bytes";
 // JSR - variable
 import "jsr:@std/jsonc@0.222.x";
 
-// JSR - caret
-import "jsr:@std/testing@^0.222.0";
-
-// JSR - specific
-import "jsr:@std/testing@0.222.0/bdd";
-
-// JSR - updated
-import "jsr:@std/yaml@123.456.789";
+// JSR - caret, extended
+import "jsr:@std/testing@^0.222.0/bdd";
 
 // HTTP
 import "https://deno.land/x/deno_graph@0.50.0/mod.ts";
 
-// HTTP - prefix
-import "https://deno.land/std@0.222.0/";
+// HTTP - updated
+import "https://deno.land/std@0.224.0/version.ts";
 
 // HTTP - unversioned
 import "https://deno.land/std/assert/mod.ts";

@@ -13,10 +13,12 @@
       "jsr:@david/which@0.3": "jsr:@david/which@0.3.0",
       "jsr:@deno/graph@^0.73.1": "jsr:@deno/graph@0.73.1",
       "jsr:@lambdalisue/async@^2.1.1": "jsr:@lambdalisue/async@2.1.1",
+      "jsr:@std/assert@0.222.0": "jsr:@std/assert@0.222.0",
       "jsr:@std/assert@^0.221.0": "jsr:@std/assert@0.221.0",
       "jsr:@std/assert@^0.222.1": "jsr:@std/assert@0.222.1",
       "jsr:@std/assert@^0.224.0": "jsr:@std/assert@0.224.0",
       "jsr:@std/assert@^0.226.0": "jsr:@std/assert@0.226.0",
+      "jsr:@std/bytes": "jsr:@std/bytes@0.221.0",
       "jsr:@std/bytes@^0.221.0": "jsr:@std/bytes@0.221.0",
       "jsr:@std/collections@^0.222.1": "jsr:@std/collections@0.222.1",
       "jsr:@std/collections@^0.224.2": "jsr:@std/collections@0.224.2",
@@ -25,6 +27,7 @@
       "jsr:@std/encoding@0.221": "jsr:@std/encoding@0.221.0",
       "jsr:@std/fmt@0.221": "jsr:@std/fmt@0.221.0",
       "jsr:@std/fmt@^0.221.0": "jsr:@std/fmt@0.221.0",
+      "jsr:@std/fmt@^0.222.0": "jsr:@std/fmt@0.222.1",
       "jsr:@std/fmt@^0.222.1": "jsr:@std/fmt@0.222.1",
       "jsr:@std/fmt@^0.224.0": "jsr:@std/fmt@0.224.0",
       "jsr:@std/fs@0.221.0": "jsr:@std/fs@0.221.0",
@@ -34,6 +37,7 @@
       "jsr:@std/io@0.221.0": "jsr:@std/io@0.221.0",
       "jsr:@std/io@^0.221.0": "jsr:@std/io@0.221.0",
       "jsr:@std/json@^0.222.1": "jsr:@std/json@0.222.1",
+      "jsr:@std/jsonc@0.222.x": "jsr:@std/jsonc@0.222.1",
       "jsr:@std/jsonc@^0.222.1": "jsr:@std/jsonc@0.222.1",
       "jsr:@std/path@0.221.0": "jsr:@std/path@0.221.0",
       "jsr:@std/path@^0.221.0": "jsr:@std/path@0.221.0",
@@ -41,6 +45,7 @@
       "jsr:@std/path@^0.225.1": "jsr:@std/path@0.225.2",
       "jsr:@std/semver@^0.222.1": "jsr:@std/semver@0.222.1",
       "jsr:@std/streams@0.221.0": "jsr:@std/streams@0.221.0",
+      "jsr:@std/testing@^0.222.0": "jsr:@std/testing@0.222.1",
       "jsr:@std/testing@^0.222.1": "jsr:@std/testing@0.222.1",
       "jsr:@std/testing@^0.224.0": "jsr:@std/testing@0.224.0",
       "jsr:@std/text@0.221": "jsr:@std/text@0.221.0",
@@ -120,6 +125,12 @@
       },
       "@std/assert@0.221.0": {
         "integrity": "a5f1aa6e7909dbea271754fd4ab3f4e687aeff4873b4cef9a320af813adb489a"
+      },
+      "@std/assert@0.222.0": {
+        "integrity": "cbf00c0d8125a56c087e3d1ea0e638760d47206b30e9d300bad826b811719fc7",
+        "dependencies": [
+          "jsr:@std/fmt@^0.222.0"
+        ]
       },
       "@std/assert@0.222.1": {
         "integrity": "691637161ee584a9919d1f9950ddd1272feb8e0a19e83aa5b7563cedaf73d74c",
@@ -1629,7 +1640,19 @@
       }
     }
   },
-  "remote": {},
+  "redirects": {
+    "https://deno.land/std/assert/mod.ts": "https://deno.land/std@0.224.0/assert/mod.ts"
+  },
+  "remote": {
+    "https://deno.land/x/deno_graph@0.69.6/deno_graph_wasm.generated.js": "db34a2f6e33c4dda6b60bdd1a698babd9593a6d042757949d773b72662a45520",
+    "https://deno.land/x/deno_graph@0.69.6/loader.ts": "512a406cb4c449b45110f2b878cd09929a883a4af193060232d2d9fc76a9d4dd",
+    "https://deno.land/x/deno_graph@0.69.6/media_type.ts": "7c1c5c6654e3cf84b8daa53c0d1ffc1b7864849406f559b961eccff859b0a417",
+    "https://deno.land/x/deno_graph@0.69.6/mod.ts": "be92f206bb38138ffc1c81a0b607dc22bb3a1dd9159b05331b2b37200ba25039",
+    "https://deno.land/x/deno_graph@0.69.6/types.ts": "bde84cb2919068c07e6cf4d8bf3054e8da908f2f221623d5302380df29b96320",
+    "https://deno.land/x/dir@1.5.1/data_local_dir/mod.ts": "91eb1c4bfadfbeda30171007bac6d85aadacd43224a5ed721bbe56bc64e9eb66",
+    "https://deno.land/x/wasmbuild@0.15.1/cache.ts": "9d01b5cb24e7f2a942bbd8d14b093751fa690a6cde8e21709ddc97667e6669ed",
+    "https://deno.land/x/wasmbuild@0.15.1/loader.ts": "8c2fc10e21678e42f84c5135d8ab6ab7dc92424c3f05d2354896a29ccfd02a63"
+  },
   "workspace": {
     "dependencies": [
       "jsr:@chiezo/amber@^0.0.4",
