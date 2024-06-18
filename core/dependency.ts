@@ -88,9 +88,14 @@ export function parse(url: string | URL): Dependency {
 
   if (matched) {
     assertExists(matched.groups);
-    const { name, version } = matched.groups;
-    const path = matched.groups.path ?? "";
-    return { protocol, name, version, path };
+    const { name, path, version } = matched.groups;
+    return {
+      protocol,
+      // jsr specifier may have a leading slash. e.g. jsr:/@std/testing^0.222.0/bdd
+      name: name.startsWith("/") ? name.slice(1) : name,
+      version,
+      path: path ?? "",
+    };
   }
 
   return { protocol, name: body, path: "" };

@@ -76,6 +76,16 @@ describe("parse", () => {
         path: "/flag.ts",
       },
     ));
+
+  it("jsr - extended", () =>
+    assertObjectMatch(
+      parse(new URL("jsr:/@std/testing@^1.0.0/bdd")),
+      {
+        name: "@std/testing",
+        version: "^1.0.0",
+        path: "/bdd",
+      },
+    ));
 });
 
 describe("stringify", () => {
