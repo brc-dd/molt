@@ -1,12 +1,6 @@
-import { assertEquals } from "@std/assert";
-import { deepMerge, omit, partition } from "@std/collections";
 import { detect as detectEOL, EOL } from "@std/fs/eol";
 import { stringify } from "./dependency.ts";
-import {
-  createLockPart,
-  type LockPart,
-  parseLockFileJson,
-} from "./lockfile.ts";
+import { type LockPart, writeToLockfile } from "./lockfile.ts";
 import {
   type CollectResult,
   type DependencyUpdate,
@@ -145,105 +139,4 @@ async function writeToImportMap(
     );
   }
   await Deno.writeTextFile(update.path, content);
-}
-
-async function writeToLockfile(
-  update: FileUpdate<"lockfile">,
-) {
-  const content = await Deno.readTextFile(update.path);
-  const original = parseLockFileJson(content);
-
-  for await (const dependency of update.dependencies) {
-    const specifier = dependency.code.specifier;
-
-    // An updated partial lockfile for the dependency.
-    const { data: patch } = await createLockPart(
-      specifier,
-      null,
-      dependency.from?.protocol.startsWith("http")
-        ? specifier.replace(
-          stringify(dependency.from),
-          stringify(dependency.to),
-        )
-        : undefined,
-    );
-
-    // Specifiers that are only depended by the current dependency.
-    const omitter = createLockFileOmitKeys(specifier, update.locks);
-
-    if (original.packages && patch.packages) {
-      original.packages.specifiers = deepMerge(
-        original.packages.specifiers,
-        patch.packages.specifiers,
-      );
-      if (patch.packages.jsr) {
-        original.packages.jsr = deepMerge(
-          omit(original.packages.jsr ?? {}, omitter.jsr),
-          patch.packages.jsr,
-          { arrays: "replace" },
-        );
-      }
-      if (patch.packages.npm) {
-        original.packages.npm = deepMerge(
-          omit(original.packages.npm ?? {}, omitter.npm),
-          patch.packages.npm,
-        );
-      }
-    }
-    if (patch.remote) {
-      original.remote = deepMerge(
-        omit(original.remote ?? {}, omitter.remote),
-        patch.remote,
-      );
-    }
-  }
-  await Deno.writeTextFile(
-    update.path,
-    JSON.stringify(original, replacer, 2) + (detectEOL(content) ?? EOL),
-  );
-}
-
-function replacer(
-  key: string,
-  value: unknown,
-) {
-  return ["specifiers", "jsr", "npm", "remote"].includes(key) && value
-    ? Object.fromEntries(Object.entries(value).sort())
-    : value;
-}
-
-interface LockFileOmitKeys {
-  jsr: string[];
-  npm: string[];
-  remote: string[];
-}
-
-/** Create a list of keys to omit from the original lockfile. */
-function createLockFileOmitKeys(
-  specifier: string,
-  locks: LockPart[],
-): LockFileOmitKeys {
-  const [relevant, others] = partition(
-    locks,
-    (it) => it.specifier === specifier,
-  );
-  assertEquals(relevant.length, 1);
-  const { data: patch } = relevant[0];
-  return {
-    jsr: Object.keys(patch.packages?.jsr ?? {}).filter((key) =>
-      !others.some((part) =>
-        Object.keys(part.data.packages?.jsr ?? {}).some((it) => it === key)
-      )
-    ),
-    npm: Object.keys(patch.packages?.npm ?? {}).filter((key) =>
-      !others.some((part) =>
-        Object.keys(part.data.packages?.npm ?? {}).some((it) => it === key)
-      )
-    ),
-    remote: Object.keys(patch.remote ?? {}).filter((key) =>
-      !others.some((part) =>
-        Object.keys(part.data.remote ?? {}).some((it) => it === key)
-      )
-    ),
-  };
 }

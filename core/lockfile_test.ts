@@ -1,3 +1,4 @@
+import * as fs from "@chiezo/amber/fs";
 import { assertEquals, assertObjectMatch } from "@std/assert";
 import {
   collectUpdateFromLockFile,
@@ -5,7 +6,10 @@ import {
   createLockPartForEach,
   parseLockFileJson,
   readLockFile,
+  writeToLockfile,
 } from "./lockfile.ts";
+import { associateByFile, type FileUpdate } from "./file.ts";
+import { collect } from "./update.ts";
 
 Deno.test("parseLockFileJson", async () =>
   assertObjectMatch(
@@ -217,4 +221,35 @@ Deno.test("collectUpdateFromLockFile - with a patch", async () => {
       map: undefined,
     },
   );
+});
+
+Deno.test("writeToLockFile", async () => {
+  const source = new URL("../test/fixtures/lockfile/mod.ts", import.meta.url);
+  const lockFile = new URL(
+    "../test/fixtures/lockfile/deno.lock",
+    import.meta.url,
+  );
+  const result = await collect(source, {
+    importMap: new URL("deno.json", source),
+    lock: true,
+    lockFile,
+  });
+  const files = associateByFile(result).filter((file) =>
+    file.kind === "lockfile"
+  ) as FileUpdate<"lockfile">[];
+
+  fs.stub(new URL("../test/fixtures/lockfile", import.meta.url));
+  const actual = await fs.use(async () => {
+    for (const file of files) {
+      await writeToLockfile(file);
+    }
+    return parseLockFileJson(await Deno.readTextFile(lockFile));
+  });
+  const expected = parseLockFileJson(
+    await Deno.readTextFile(
+      new URL("../test/fixtures/lockfile/deno.updated.lock", import.meta.url),
+    ),
+  );
+  // deno-lint-ignore no-explicit-any
+  assertObjectMatch(actual, expected as any);
 });
