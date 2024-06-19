@@ -14,7 +14,8 @@
           inherit system;
           overlays = [ rust.overlays.default ];
         };
-        rust-toolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override {
+        dir = builtins.getEnv "PWD";
+        rust-toolchain = (pkgs.rust-bin.fromRustupToolchainFile "${dir}/rust-toolchain.toml").override {
           targets = [ "wasm32-unknown-unknown" ];
         };
       in
