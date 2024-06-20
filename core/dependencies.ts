@@ -159,7 +159,7 @@ export async function collectFromEsModules(
       deps.push(fromDependencyJson(json, mod.specifier))
     )
   );
-  return deps.sort((a, b) => a.url.localeCompare(b.url));
+  return deps.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function fromDependencyJson(

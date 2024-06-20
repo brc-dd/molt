@@ -2,11 +2,10 @@ import { detect as detectEOL, EOL } from "@std/fs/eol";
 import { stringify } from "./dependency.ts";
 import { type LockPart, writeToLockfile } from "./lockfile.ts";
 import {
-  type CollectResult,
   type DependencyUpdate,
   type SourceType,
   sourceTypeOf,
-} from "./update.ts";
+} from "./updates.ts";
 
 /**
  * A collection of updates to dependencies associated with a file.
