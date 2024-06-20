@@ -3,6 +3,7 @@ import { toUrl } from "@molt/lib/path";
 import { assertExists } from "@std/assert";
 import * as SemVer from "@std/semver";
 import { createGraphLocally } from "./graph.ts";
+import { readImportMapJson } from "./import_map.ts";
 
 export interface DependencyComps {
   /** The URL protocol of the dependency specifier.
@@ -51,7 +52,7 @@ export function parse(url: string | URL): DependencyComps {
   return { protocol, name: body, entrypoint: "" };
 }
 
-/** Convert the given protocol to a URL scheme. */
+/** Convert the given protocol to a full URL scheme. */
 function addSeparator(protocol: string): string {
   switch (protocol) {
     case "file:":
@@ -120,15 +121,7 @@ export interface Dependency<
   referrer: DependencyReferrer<S>;
 }
 
-export interface CollectOptions {
-  /**
-   * The path to the import map used to resolve dependencies.
-   * @example "/path/to/import_map.json"
-   */
-  importMap?: string | URL;
-}
-
-export interface CollectFromModuleOptions extends CollectOptions {
+export interface CollectFromModuleOptions {
   /** Whether to resolve local imports and find dependencies recursively.
    * @default true */
   recursive?: boolean;
@@ -174,6 +167,27 @@ function fromDependencyJson(
 }
 
 export async function collectFromImportMap(
-  importMap: string | URL,
+  path: string | URL,
 ): Promise<Dependency[]> {
+  const url = toUrl(path);
+  const json = await readImportMapJson(path);
+  const deps: Dependency[] = [];
+  for (const entry of Object.entries(json.imports)) {
+    const dep = fromImportMapEntry(entry, url);
+    if (dep) deps.push(dep);
+  }
+  return deps;
+}
+
+function fromImportMapEntry(
+  [specifier, url]: [string, string],
+  referrer: string,
+): Dependency | undefined {
+  const dep = parse(url);
+  return {
+    url,
+    ...dep,
+    specifier,
+    referrer: { url: referrer, span: undefined },
+  };
 }
