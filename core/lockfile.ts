@@ -1,40 +1,48 @@
-import { omit } from "@std/collections";
 import { toPath } from "@molt/lib/path";
+import { omit } from "@std/collections";
 import {
+  instantiate,
   type Lockfile,
   type LockfileJson,
-  parseFromJson,
 } from "./deno_lockfile/js/mod.ts";
 
 export type { Lockfile, LockfileJson };
 
+const wasm = await instantiate();
+
 /**
  * Create a LockFile object from the given lock file.
  *
- * @param specifier - The URL or path to the lockfile.
- * @returns The parsed `LockFile` object.
+ * @param path - The URL or path to the lockfile.
+ * @returns The `Lockfile` object abstracting the lockfile.
  */
 export async function readLockFile(
-  specifier: URL | string,
+  path: URL | string,
 ): Promise<Lockfile> {
-  const path = toPath(specifier);
-  return parseFromJson(path, await Deno.readTextFile(path));
+  path = toPath(path);
+  return wasm.parseFromJson(path, await Deno.readTextFile(path));
 }
 
 /**
- * Extract a partial lock for a dependency from a lockfile.
+ * Extract the partial lock for the given JSR or NPM package from a lockfile.
  *
- * @param specifier - The import specifier of the JSR package.
- * @param lockfile - The lockfile to extract a partial lock for the dependency from.
- * @returns The partial lock file for the dependency.
+ * @param name - The import requirement of the JSR or NPM package.
+ * @param lockfile - The `Lockfile` object to extract the partial lock for the dependency from.
+ * @returns The `Lockfile` object representing the partial lock.
+ *
+ * @example
+ * ```typescript
+ * const lockfile = await readLockFile("deno.lock");
+ * extractPackage("jsr:@std/testing@^0.222.0", lockfile);
+ * ```
  */
-export async function extractJsrPackage(
-  specifier: string,
+export function extractPackage(
+  name: string,
   lockfile: Lockfile,
-): Promise<Lockfile> {
+): Lockfile {
   const copy = lockfile.copy();
-  copy.setWorkspaceConfig({ dependencies: [specifier] });
-  return await parseFromJson(
+  copy.setWorkspaceConfig({ dependencies: [name] });
+  return wasm.parseFromJson(
     copy.filename,
     omit(copy.toJson(), ["remote", "redirects"]),
   );

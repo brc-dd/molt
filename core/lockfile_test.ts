@@ -1,6 +1,6 @@
 import { assertEquals, assertObjectMatch } from "@std/assert";
 import { beforeEach, describe, it } from "@std/testing/bdd";
-import { extractJsrPackage, type Lockfile, readLockFile } from "./lockfile.ts";
+import { extractPackage, type Lockfile, readLockFile } from "./lockfile.ts";
 
 describe("readLockFile", () => {
   it("should read a lockfile", async () => {
@@ -23,7 +23,7 @@ describe("readLockFile", () => {
   });
 });
 
-describe("extractJsrPackage", () => {
+describe("extractPackage", () => {
   let lockfile: Lockfile;
 
   beforeEach(async () => {
@@ -32,8 +32,8 @@ describe("extractJsrPackage", () => {
     );
   });
 
-  it("should extract the partial lock for a JSR package from a lockfile", async () => {
-    const part = await extractJsrPackage("jsr:@std/testing@^0.222.0", lockfile);
+  it("should extract the partial lock for a package from a lockfile", () => {
+    const part = extractPackage("jsr:@std/testing@^0.222.0", lockfile);
     assertEquals(part.toJson(), {
       version: "3",
       packages: {
@@ -52,8 +52,8 @@ describe("extractJsrPackage", () => {
     });
   });
 
-  it("should extract the partial lock along with the dependencies", async () => {
-    const part = await extractJsrPackage("jsr:@std/assert@^0.222.0", lockfile);
+  it("should extract the partial lock along with the dependencies", () => {
+    const part = extractPackage("jsr:@std/assert@^0.222.0", lockfile);
     assertEquals(part.toJson(), {
       version: "3",
       packages: {
