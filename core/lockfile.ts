@@ -1,14 +1,16 @@
 import { toPath } from "@molt/lib/path";
-import { omit } from "@std/collections";
+import { filterValues, pick } from "@std/collections";
 import {
   instantiate,
   type Lockfile,
   type LockfileJson,
 } from "./deno_lockfile/js/mod.ts";
+import { DependencyUpdate } from "./update.ts";
+import { createGraph } from "@deno/graph";
 
 export type { Lockfile, LockfileJson };
 
-const wasm = await instantiate();
+const { parseFromJson } = await instantiate();
 
 /**
  * Create a LockFile object from the given lock file.
@@ -20,7 +22,7 @@ export async function readLockFile(
   path: URL | string,
 ): Promise<Lockfile> {
   path = toPath(path);
-  return wasm.parseFromJson(path, await Deno.readTextFile(path));
+  return parseFromJson(path, await Deno.readTextFile(path));
 }
 
 /**
@@ -39,11 +41,39 @@ export async function readLockFile(
 export function extractPackage(
   name: string,
   lockfile: Lockfile,
-): Lockfile {
+): LockfileJson {
+  // We must copy the lockfile to avoid mutating the original.
   const copy = lockfile.copy();
   copy.setWorkspaceConfig({ dependencies: [name] });
-  return wasm.parseFromJson(
-    copy.filename,
-    omit(copy.toJson(), ["remote", "redirects"]),
-  );
+  return {
+    ...pick(copy.toJson(), ["version", "packages", "workspace"]),
+    remote: {},
+  };
+}
+
+/**
+ * Extract the partial lock for the given remote specifier from a lockfile.
+ */
+export async function extractRemote(
+  specifier: string,
+  lockfile: Lockfile,
+): Promise<LockfileJson> {
+  const original = lockfile.toJson();
+  const graph = await createGraph(specifier);
+  const dependencies = graph.modules.map((mod) => mod.specifier);
+  return {
+    version: original.version,
+    remote: filterValues(
+      pick(original.remote, dependencies),
+      (hash) => hash !== undefined,
+    ),
+  };
+}
+
+/**
+ * Create a new lockfile with the dependencies updated.
+ */
+export async function recreate(
+  lockfile: LockfileJson,
+): Promise<LockfileJson> {
 }

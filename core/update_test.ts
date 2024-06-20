@@ -10,16 +10,16 @@ import { LatestVersionStub } from "../test/mock.ts";
 Deno.test("collect - deno.jsonc", async () => {
   using _stub = LatestVersionStub.create("123.456.789");
 
-  const result = await collect(
+  const updates = await collect(
     new URL("../test/fixtures/deno.jsonc", import.meta.url),
   );
-  assertEquals(result.updates.length, 7);
+  assertEquals(updates.length, 7);
 
   const assertNextUpdate = (
     // deno-lint-ignore no-explicit-any
     expected: any,
   ) => {
-    const actual = result.updates.shift();
+    const actual = updates.shift();
     assertExists(actual);
     assertObjectMatch(actual, expected);
     assertExists(actual.map?.source);
@@ -191,16 +191,16 @@ Deno.test("collect - deno.jsonc", async () => {
 Deno.test("collect - deps.ts", async () => {
   using _stub = LatestVersionStub.create({ _: "123.456.789" });
 
-  const result = await collect(
+  const updates = await collect(
     new URL("../test/fixtures/deps.ts", import.meta.url),
   );
-  assertEquals(result.updates.length, 7);
+  assertEquals(updates.length, 7);
 
   const assertNextUpdate = (
     // deno-lint-ignore no-explicit-any
     expected: any,
   ) => {
-    const actual = result.updates.shift();
+    const actual = updates.shift();
     assertExists(actual);
     assertObjectMatch(actual, expected);
     assertEquals(actual.map, undefined);
@@ -369,11 +369,11 @@ Deno.test("collect - deps.ts", async () => {
 
 Deno.test("collect - mod.ts", async () => {
   using _stub = LatestVersionStub.create({ _: "123.456.789" });
-  const result = await collect(
+  const updates = await collect(
     new URL("../test/fixtures/mod.ts", import.meta.url),
   );
-  assertEquals(result.updates.length, 1);
-  const update = result.updates[0];
+  assertEquals(updates.length, 1);
+  const update = updates[0];
   // http export
   assertObjectMatch(update, {
     from: {
@@ -398,14 +398,14 @@ Deno.test("collect - mod.ts", async () => {
 
 Deno.test("collect - mod_test.ts", async () => {
   using _stub = LatestVersionStub.create({ _: "123.456.789" });
-  const result = await collect(
+  const updates = await collect(
     new URL("../test/fixtures/mod_test.ts", import.meta.url),
     {
       importMap: new URL("../test/fixtures/deno.jsonc", import.meta.url),
       resolveLocal: true,
     },
   );
-  assertEquals(result.updates.length, 3);
+  assertEquals(updates.length, 3);
 
   const assertNextUpdate = (
     // deno-lint-ignore no-explicit-any
@@ -413,7 +413,7 @@ Deno.test("collect - mod_test.ts", async () => {
     referrer: string,
     source?: string,
   ) => {
-    const actual = result.updates.shift();
+    const actual = updates.shift();
     assertExists(actual);
     assertObjectMatch(actual, expected);
     if (expected.map) {

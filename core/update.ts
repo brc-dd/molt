@@ -1,19 +1,7 @@
+import type { DependencyJson } from "@deno/graph/types";
 import { findFileUp, toPath, toUrl } from "@molt/lib/path";
 import { assertExists } from "@std/assert";
 import { partition } from "@std/collections";
-import { exists } from "@std/fs";
-import type {
-  DependencyJson,
-  ModuleJson,
-  ResolvedDependency,
-} from "@deno/graph/types";
-import { createGraphLocally } from "./graph.ts";
-import {
-  type ImportMap,
-  type ImportMapResolveResult,
-  readImportMapJson,
-  tryReadFromJson,
-} from "./import_map.ts";
 import {
   type Dependency,
   hasVersionRange,
@@ -22,15 +10,13 @@ import {
   stringify,
   type UpdatedDependency,
 } from "./dependency.ts";
+import { createGraphLocally } from "./graph.ts";
 import {
-  collectUpdateFromLockFile,
-  CommandError,
-  createLockPart,
-  type LockFile,
-  type LockFileJson,
-  type LockPart,
-  readLockFile,
-} from "./lockfile.ts";
+  type ImportMap,
+  type ImportMapResolveResult,
+  readImportMapJson,
+  tryReadFromJson,
+} from "./import_map.ts";
 
 export type SourceType = "import_map" | "module" | "lockfile";
 
@@ -59,7 +45,6 @@ export interface DependencyUpdate<
     span: T extends "module" ? NonNullable<DependencyJson["code"]>["span"]
       : undefined;
   };
-  lock: T extends "lockfile" ? LockFileJson : undefined;
   /**
    * Information about the import map used to resolve the dependency.
    */
@@ -112,18 +97,6 @@ export interface CollectOptions {
    */
   importMap?: string | URL;
   /**
-   * Whether to collect updates from the lockfile and update it.
-   * @default false
-   */
-  lock?: boolean;
-  /**
-   * The path to the lockfile being updated.
-   * If not specified, molt will try to find `deno.lock` in the current directory
-   * or parent directories.
-   * @example "./deno/lock.json"
-   */
-  lockFile?: string | URL;
-  /**
    * A function to filter out dependencies.
    * @example
    * ```ts
@@ -153,16 +126,6 @@ export interface CollectOptions {
 }
 
 /**
- * The result of collecting dependencies.
- */
-export interface CollectResult {
-  /** Partial lockfiles for all dependencies found, which will be used to update the lockfile. */
-  locks: LockPart[];
-  /** The updates to dependencies. */
-  updates: DependencyUpdate[];
-}
-
-/**
  * Collect dependencies from the given module(s) or Deno configuration file(s).
  * Local submodules are also checked recursively.
 
@@ -184,7 +147,7 @@ export interface CollectResult {
 export async function collect(
   from: string | URL | (string | URL)[],
   options: CollectOptions = {},
-): Promise<CollectResult> {
+): Promise<DependencyUpdate[]> {
   const cwd = options.cwd ?? Deno.cwd();
 
   const importMapPath = options.importMap ??
@@ -192,14 +155,6 @@ export async function collect(
   const importMap = importMapPath
     ? await tryReadFromJson(toUrl(importMapPath))
     : undefined;
-
-  const lockFilePath = (options.lock ?? false)
-    ? (options.lockFile ??
-      (importMapPath
-        ? await maybeFile(new URL("deno.lock", toUrl(importMapPath)))
-        : undefined))
-    : undefined;
-  const lockFile = lockFilePath ? await readLockFile(lockFilePath) : undefined;
 
   const urls = [from].flat().map((path) => toUrl(path));
   const [jsons, esms] = partition(urls, isJsonPath);
@@ -209,47 +164,19 @@ export async function collect(
     resolveLocal: options.resolveLocal ??= true,
   });
 
-  const _options: CollectInnerOptions = {
-    cache: true,
-    ...options,
-    importMap,
-    lockFile,
-  };
-  const showResolveWarning = (
-    mod: ModuleJson,
-    errorDependency: ErrorResolvedDependency,
-  ) => {
-    const { error, span: { start } } = errorDependency;
-    console.warn(
-      `Failed to resolve dependency at ${mod.specifier}:${start.line}:${start.character}: ${error}`,
-    );
-  };
-  const result = reduceCollectResult(
-    await Promise.all([
-      ...graph.modules.flatMap((mod) =>
-        (mod.dependencies ?? [])
-          .filter((dependency) => {
-            if (isErrorResolvdDependency(dependency.code)) {
-              showResolveWarning(mod, dependency.code);
-              return false;
-            }
-            if (isErrorResolvdDependency(dependency.type)) {
-              showResolveWarning(mod, dependency.type);
-              return false;
-            }
-            return true;
-          })
-          .map((dependency) =>
-            collectFromDependency(dependency, mod.specifier, _options)
-          )
-      ),
-      ...jsons.map((url) => collectFromImportMap(url, _options)),
-    ]),
-  );
-  return {
-    locks: result.locks,
-    updates: result.updates.sort((a, b) => a.to.name.localeCompare(b.to.name)),
-  };
+  const _options: CheckOptions = { cache: true, ...options, importMap };
+
+  const updates: DependencyUpdate[] = [];
+  for (const mod of graph.modules) {
+    for (const dep of mod.dependencies ?? []) {
+      const update = await checkDependency(dep, mod.specifier, _options);
+      if (update) updates.push(update);
+    }
+  }
+  for (const url of jsons) {
+    (await collectFromImportMap(url, _options)).forEach((u) => updates.push(u));
+  }
+  return updates.sort((a, b) => a.referrer.localeCompare(b.referrer));
 }
 
 //----------------------------------
@@ -258,30 +185,15 @@ export async function collect(
 //
 //----------------------------------
 
-interface CollectInnerOptions
-  extends Omit<CollectOptions, "importMap" | "lockFile"> {
+interface CheckOptions extends Omit<CollectOptions, "importMap" | "lockFile"> {
   importMap?: ImportMap;
-  lockFile?: LockFile;
 }
 
-function reduceCollectResult(
-  results: CollectResult[],
-): CollectResult {
-  return results.reduce(
-    (acc, { locks, updates }) => ({
-      locks: acc.locks.concat(locks),
-      updates: acc.updates.concat(updates),
-    }),
-    { locks: [], updates: [] },
-  );
-}
-
-/** Create a DependencyUpdate from the given dependency. */
-async function collectFromDependency(
+async function checkDependency(
   dependencyJson: DependencyJson,
   referrer: string,
-  options: CollectInnerOptions,
-): Promise<CollectResult> {
+  options: CheckOptions,
+) {
   const resolved = dependencyJson.code?.specifier ??
     dependencyJson.type?.specifier;
   if (!resolved) {
@@ -291,43 +203,36 @@ async function collectFromDependency(
     );
   }
   if (resolved.startsWith("file:")) {
-    return { locks: [], updates: [] };
+    return;
   }
-  const lock = options.lockFile
-    ? await createLockPart(resolved, options.lockFile)
-    : undefined;
+
   const mapped = options.importMap?.resolve(
     dependencyJson.specifier,
     referrer,
   ) as ImportMapResolveResult<true> | undefined;
+
   const dependency = parse(new URL(mapped?.value ?? resolved));
-  const none = { locks: lock ? [lock] : [], updates: [] };
+
   if (options.ignore?.(dependency) || options.only?.(dependency) === false) {
-    return none;
+    return;
   }
-  if (options.lockFile && hasVersionRange(dependency)) {
-    return {
-      ...none,
-      updates: await collectUpdateFromLockFile(
-        options.lockFile,
-        resolved,
-      ),
-    };
+  if (hasVersionRange(dependency)) {
+    return;
   }
+
   const latest = await resolveLatestVersion(dependency, {
     cache: options.cache,
   });
   if (!latest || latest.version === dependency.version) {
-    return none;
+    return;
   }
+
   const span = dependencyJson.code?.span ?? dependencyJson.type?.span;
   assertExists(span);
-  const update = {
+
+  return {
     from: normalizeWithUpdated(dependency, latest),
     to: latest,
-  };
-  const updates: DependencyUpdate[] = [{
-    ...update,
     code: {
       // We prefer to put the original specifier here.
       specifier: dependencyJson.specifier,
@@ -336,83 +241,51 @@ async function collectFromDependency(
     map: mapped ? { source: options.importMap!.path, ...mapped } : undefined,
     lock: undefined,
     referrer: toPath(referrer),
-  }];
-  if (options.lockFile) {
-    updates.push({
-      ...update,
-      code: { specifier: resolved, span: undefined },
-      lock: (await createLockPart(
-        resolved,
-        null,
-        resolved.replace(
-          stringify(update.from),
-          stringify(update.to),
-        ),
-      )).data,
-      map: undefined,
-      referrer: options.lockFile.path,
-    });
-  }
-  return { ...none, updates };
+  };
 }
 
 async function collectFromImportMap(
   path: string,
-  options: CollectInnerOptions,
-): Promise<CollectResult> {
+  options: CheckOptions,
+): Promise<DependencyUpdate[]> {
   const json = await readImportMapJson(new URL(path));
-  return reduceCollectResult(
-    await Promise.all(
-      Object.entries(json.imports).map((entry) =>
-        collectFromImportMapEntry(path, entry, options)
-      ),
-    ),
-  );
+  const updates: DependencyUpdate[] = [];
+  for (const entry of Object.entries(json.imports)) {
+    const update = await checkImportMapEntry(path, entry, options);
+    if (update) updates.push(update);
+  }
+  return updates;
 }
 
-async function collectFromImportMapEntry(
+async function checkImportMapEntry(
   path: string,
   entry: [string, string],
-  options: CollectInnerOptions,
-): Promise<CollectResult> {
+  options: CheckOptions,
+): Promise<DependencyUpdate | undefined> {
   const [mapFrom, mapTo] = entry;
   if (!URL.canParse(mapTo)) { // map to a local file
-    return { locks: [], updates: [] };
+    return;
   }
-  const lock = options.lockFile
-    ? await _createLockPart(mapTo, options.lockFile)
-    : undefined;
   const dependency = parse(new URL(mapTo));
-  const none = { locks: lock ? [lock] : [], updates: [] };
   if (options.ignore?.(dependency) || options.only?.(dependency) === false) {
-    return none;
+    return;
   }
-  if (options.lockFile && hasVersionRange(dependency)) {
-    return {
-      ...none,
-      updates: await collectUpdateFromLockFile(
-        options.lockFile,
-        mapTo,
-      ),
-    };
+  if (hasVersionRange(dependency)) {
+    return;
   }
   const latest = await resolveLatestVersion(dependency, {
     cache: options.cache,
   });
   if (!latest || latest.version === dependency.version) {
-    return none;
+    return;
   }
-  const update = {
+  return {
     from: normalizeWithUpdated(dependency, latest),
     to: latest,
-  };
-  const updates: DependencyUpdate[] = [{
-    ...update,
     code: {
       specifier: mapTo,
       span: undefined,
     },
-    lock: undefined,
     map: {
       source: toPath(path),
       resolved: mapTo,
@@ -420,41 +293,7 @@ async function collectFromImportMapEntry(
       value: stringify(latest),
     },
     referrer: toPath(path),
-  }];
-  if (options.lockFile) {
-    updates.push({
-      ...update,
-      code: { specifier: mapTo, span: undefined },
-      lock: (await createLockPart(
-        mapTo,
-        null,
-        mapTo.replace(
-          stringify(update.from),
-          stringify(update.to),
-        ),
-      )).data,
-      map: undefined,
-      referrer: options.lockFile.path,
-    });
-  }
-  return { ...none, updates };
-}
-
-async function _createLockPart(
-  specifier: string,
-  locked?: LockFile,
-): Promise<LockPart> {
-  try {
-    return await createLockPart(specifier, locked);
-  } catch (err) {
-    if (err instanceof CommandError) {
-      throw new Deno.errors.NotSupported(
-        `Can't update a lockfile for an import map including any URL that can'be imported as is.`,
-        { cause: specifier },
-      );
-    }
-    throw err;
-  }
+  };
 }
 
 //----------------------------------
@@ -462,10 +301,6 @@ async function _createLockPart(
 // Utility functions
 //
 //----------------------------------
-
-async function maybeFile(path: string | URL) {
-  return await exists(path) ? path : undefined;
-}
 
 function isJsonPath(path: string) {
   return path.endsWith(".json") || path.endsWith(".jsonc");
@@ -482,14 +317,4 @@ function normalizeWithUpdated(
     ...updated,
     version: undefined,
   };
-}
-
-type ErrorResolvedDependency = ResolvedDependency & {
-  error: NonNullable<ResolvedDependency["error"]>;
-};
-
-function isErrorResolvdDependency(
-  x: ResolvedDependency | undefined,
-): x is ErrorResolvedDependency {
-  return x?.error != null;
 }

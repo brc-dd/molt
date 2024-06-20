@@ -1,10 +1,15 @@
 import { assertEquals, assertObjectMatch } from "@std/assert";
 import { beforeEach, describe, it } from "@std/testing/bdd";
-import { extractPackage, type Lockfile, readLockFile } from "./lockfile.ts";
+import {
+  extractPackage,
+  extractRemote,
+  type Lockfile,
+  readLockfile,
+} from "./lockfile.ts";
 
 describe("readLockFile", () => {
   it("should read a lockfile", async () => {
-    const lockfile = await readLockFile(
+    const lockfile = await readLockfile(
       new URL("../test/fixtures/deno.lock", import.meta.url),
     );
     assertObjectMatch(
@@ -27,14 +32,14 @@ describe("extractPackage", () => {
   let lockfile: Lockfile;
 
   beforeEach(async () => {
-    lockfile = await readLockFile(
+    lockfile = await readLockfile(
       new URL("../test/fixtures/deno.lock", import.meta.url),
     );
   });
 
   it("should extract the partial lock for a package from a lockfile", () => {
     const part = extractPackage("jsr:@std/testing@^0.222.0", lockfile);
-    assertEquals(part.toJson(), {
+    assertEquals(part, {
       version: "3",
       packages: {
         specifiers: {
@@ -54,7 +59,7 @@ describe("extractPackage", () => {
 
   it("should extract the partial lock along with the dependencies", () => {
     const part = extractPackage("jsr:@std/assert@^0.222.0", lockfile);
-    assertEquals(part.toJson(), {
+    assertEquals(part, {
       version: "3",
       packages: {
         specifiers: {
@@ -76,9 +81,23 @@ describe("extractPackage", () => {
         },
       },
       remote: {},
-      workspace: {
-        dependencies: ["jsr:@std/assert@^0.222.0"],
-      },
+      workspace: { dependencies: ["jsr:@std/assert@^0.222.0"] },
+    });
+  });
+});
+
+describe("extractRemote", () => {
+  it("should extract the remote dependencies", async () => {
+    const lockfile = await readLockfile(
+      new URL("../test/fixtures/deno.lock", import.meta.url),
+    );
+    const actual = await extractRemote(
+      "https://deno.land/x/deno_graph@0.50.0/mod.ts",
+      lockfile,
+    );
+    assertEquals(actual, {
+      version: "3",
+      remote: lockfile.toJson().remote,
     });
   });
 });
