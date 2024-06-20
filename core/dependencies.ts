@@ -115,8 +115,6 @@ export interface Dependency<
 > extends DependencyComps {
   /** The original specifier of the dependency appeared in the code. */
   specifier: string;
-  /** The fully resolved specifier of the dependency. */
-  url: string;
   /** Information about the referrer of the dependency. */
   referrer: DependencyReferrer<S>;
 }
@@ -158,36 +156,25 @@ function fromDependencyJson(
   const { span } = json.code ?? json.type ?? {};
   if (url && span) {
     return {
-      url,
-      ...parse(url),
       specifier,
+      ...parse(url),
       referrer: { url: referrer, span },
     };
   }
 }
 
+/**
+ * Collect dependencies from the given import map file, or a Deno configuration
+ * file, sorted lexically by name.
+ */
 export async function collectFromImportMap(
   path: string | URL,
 ): Promise<Dependency[]> {
   const url = toUrl(path);
   const json = await readImportMapJson(path);
-  const deps: Dependency[] = [];
-  for (const entry of Object.entries(json.imports)) {
-    const dep = fromImportMapEntry(entry, url);
-    if (dep) deps.push(dep);
-  }
-  return deps;
-}
-
-function fromImportMapEntry(
-  [specifier, url]: [string, string],
-  referrer: string,
-): Dependency | undefined {
-  const dep = parse(url);
-  return {
-    url,
-    ...dep,
+  return Object.values(json.imports).map((specifier) => ({
     specifier,
-    referrer: { url: referrer, span: undefined },
-  };
+    ...parse(specifier),
+    referrer: { url, span: undefined },
+  })).sort((a, b) => a.name.localeCompare(b.name));
 }

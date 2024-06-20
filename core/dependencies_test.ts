@@ -7,7 +7,7 @@ import { collectFromEsModules, collectFromImportMap } from "./dependencies.ts";
 
 describe("collectFromEsModules", () => {
   beforeEach(() => {
-    fs.stub(".");
+    fs.stub(".", { readThrough: false });
     fs.mock();
   });
 
@@ -24,15 +24,13 @@ describe("collectFromEsModules", () => {
       `,
     );
     const actual = await collectFromEsModules("a.ts");
-    // Results should be sorted by the lexical order of the names.
     assertEquals(actual, [
       {
-        url: "jsr:@std/assert@0.222.0",
+        specifier: "jsr:@std/assert@0.222.0",
         protocol: "jsr:",
         name: "@std/assert",
         version: "0.222.0",
         entrypoint: "",
-        specifier: "jsr:@std/assert@0.222.0",
         referrer: {
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
@@ -42,12 +40,11 @@ describe("collectFromEsModules", () => {
         },
       },
       {
-        url: "https://deno.land/std@0.222.0/bytes/copy.ts",
+        specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
         protocol: "https:",
         name: "deno.land/std",
         version: "0.222.0",
         entrypoint: "/bytes/copy.ts",
-        specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
         referrer: {
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
@@ -75,12 +72,11 @@ describe("collectFromEsModules", () => {
     const actual = await collectFromEsModules(["a.ts", "b.ts"]);
     assertEquals(actual, [
       {
-        url: "jsr:@std/assert@0.222.0",
+        specifier: "jsr:@std/assert@0.222.0",
         protocol: "jsr:",
         name: "@std/assert",
         version: "0.222.0",
         entrypoint: "",
-        specifier: "jsr:@std/assert@0.222.0",
         referrer: {
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
@@ -90,12 +86,11 @@ describe("collectFromEsModules", () => {
         },
       },
       {
-        url: "https://deno.land/std@0.222.0/bytes/copy.ts",
-        protocol: "https:",
+        specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
         name: "deno.land/std",
+        protocol: "https:",
         version: "0.222.0",
         entrypoint: "/bytes/copy.ts",
-        specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
         referrer: {
           url: "file://" + join(Deno.cwd(), "b.ts"),
           span: {
@@ -143,12 +138,11 @@ describe("collectFromImportMap", () => {
     const actual = await collectFromImportMap("a.json");
     assertEquals(actual, [
       {
-        url: "jsr:@std/assert@0.222.0",
+        specifier: "jsr:@std/assert@0.222.0",
         protocol: "jsr:",
         name: "@std/assert",
         version: "0.222.0",
         entrypoint: "",
-        specifier: "@std/assert",
         referrer: {
           url: "file://" + join(Deno.cwd(), "a.json"),
           span: undefined,
