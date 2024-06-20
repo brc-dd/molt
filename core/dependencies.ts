@@ -1,9 +1,8 @@
 import type { DependencyJson } from "@deno/graph/types";
 import { toUrl } from "@molt/lib/path";
+import { assertExists } from "@std/assert";
 import * as SemVer from "@std/semver";
 import { createGraphLocally } from "./graph.ts";
-import type { ImportMapResolveResult } from "./import_map.ts";
-import { assertExists } from "@std/assert";
 
 export interface DependencyComps {
   /** The URL protocol of the dependency specifier.
@@ -102,12 +101,6 @@ export function hasVersionRange(
 export type SourceType = "import_map" | "lockfile" | "module";
 export type RangeJson = NonNullable<DependencyJson["code"]>["span"];
 
-export interface DependencyMapInfo extends ImportMapResolveResult {
-  /** The full path to the import map used to resolve the dependency.
-   * @example "/path/to/import_map.json" */
-  source: string;
-}
-
 export interface DependencyReferrer<S extends SourceType> {
   /** The full path to the module that imports the dependency.
    * @example "file:///path/to/mod.ts" */
@@ -123,8 +116,6 @@ export interface Dependency<
   specifier: string;
   /** The fully resolved specifier of the dependency. */
   url: string;
-  /** Information about the import map used to resolve the dependency. */
-  map: S extends "import_map" ? DependencyMapInfo : undefined;
   /** Information about the referrer of the dependency. */
   referrer: DependencyReferrer<S>;
 }
@@ -144,7 +135,9 @@ export interface CollectFromModuleOptions extends CollectOptions {
 }
 
 /**
- * Collect dependencies from the given ES module(s).
+ * Collect dependencies from the given ES module(s), sorted by name.
+ * @param paths The path to the ES module(s) to collect dependencies from.
+ * @param options The options to customize the collection process.
  */
 export async function collectFromEsModules(
   paths: string | URL | (string | URL)[],
@@ -155,9 +148,10 @@ export async function collectFromEsModules(
 
   const deps: Dependency[] = [];
   graph.modules.forEach((mod) =>
-    mod.dependencies?.forEach((json) =>
-      deps.push(fromDependencyJson(json, mod.specifier))
-    )
+    mod.dependencies?.forEach((json) => {
+      const dep = fromDependencyJson(json, mod.specifier);
+      if (dep) deps.push(dep);
+    })
   );
   return deps.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -165,29 +159,21 @@ export async function collectFromEsModules(
 function fromDependencyJson(
   json: DependencyJson,
   referrer: string,
-): Dependency {
-  /** The original specifier of the dependency appeared in the code. */
+): Dependency | undefined {
   const specifier = json.specifier;
-  /** The fully resolved specifier of the dependency. */
   const url = json.code?.specifier ?? json.type?.specifier;
-  if (!url) {
-    throw new Error(
-      `Could not resolve the dependency specifier: ${specifier}`,
-      { cause: json },
-    );
-  }
   const { span } = json.code ?? json.type ?? {};
-  if (!span) {
-    throw new Error(
-      `Could not find the range of the dependency specifier: ${specifier}`,
-      { cause: json },
-    );
+  if (url && span) {
+    return {
+      url,
+      ...parse(url),
+      specifier,
+      referrer: { url: referrer, span },
+    };
   }
-  return {
-    url,
-    ...parse(url),
-    specifier,
-    map: undefined,
-    referrer: { url: referrer, span },
-  };
+}
+
+export async function collectFromImportMap(
+  importMap: string | URL,
+): Promise<Dependency[]> {
 }

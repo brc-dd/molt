@@ -9,7 +9,7 @@ export function createGraphLocally(
   options?: CreateGraphOptions,
 ) {
   const recursive = options?.recursive ?? true;
-    
+
   return createGraph(specifiers, {
     load: async (specifier) => {
       const url = new URL(specifier); // should not throw
