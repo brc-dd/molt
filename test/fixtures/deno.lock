@@ -32,11 +32,8 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@std/assert@0.222.0",
-      "jsr:@std/bytes",
-      "jsr:@std/jsoc@0.222.x",
-      "jsr:@std/testing@0.222.0",
-      "npm:@octokit/core@6.1.0"
+      "jsr:@std/assert@^0.222.0",
+      "jsr:@std/testing@^0.222.0"
     ]
   }
 }
