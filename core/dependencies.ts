@@ -131,15 +131,6 @@ export interface Dependency<
 
 export interface CollectOptions {
   /**
-   * A function to filter dependencies.
-   * @example
-   * await collect("mod.ts", {
-   *   filter: (dep) => dep.name.startsWith("deno.land/std")
-   * });
-   * // -> Pick up dependencies from deno.land/std only
-   */
-  filter?: (dependency: Dependency) => boolean;
-  /**
    * The path to the import map used to resolve dependencies.
    * @example "/path/to/import_map.json"
    */
@@ -155,13 +146,12 @@ export interface CollectFromModuleOptions extends CollectOptions {
 /**
  * Collect dependencies from the given ES module(s).
  */
-export async function collectFromModules(
+export async function collectFromEsModules(
   paths: string | URL | (string | URL)[],
   options: CollectFromModuleOptions = {},
 ) {
   const urls = [paths].flat().map(toUrl);
   const graph = await createGraphLocally(urls, options);
-  console.log(graph);
 
   const deps: Dependency[] = [];
   graph.modules.forEach((mod) =>
@@ -169,7 +159,7 @@ export async function collectFromModules(
       deps.push(fromDependencyJson(json, mod.specifier))
     )
   );
-  return deps;
+  return deps.sort((a, b) => a.url.localeCompare(b.url));
 }
 
 function fromDependencyJson(

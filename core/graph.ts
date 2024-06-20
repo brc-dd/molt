@@ -8,6 +8,7 @@ export function createGraphLocally(
   specifiers: string[],
   options?: CreateGraphOptions & { recursive?: boolean },
 ) {
+  const recursive = options?.recursive ?? true;
   return createGraph(specifiers, {
     load: async (specifier) => {
       const url = new URL(specifier); // should not throw
@@ -15,10 +16,6 @@ export function createGraphLocally(
         case "node:":
         case "npm:":
         case "jsr:":
-          return {
-            kind: "external",
-            specifier,
-          };
         case "http:":
         case "https:":
           return {
@@ -26,9 +23,7 @@ export function createGraphLocally(
             specifier,
           };
         case "file:":
-          if (
-            options?.recursive === false && !specifiers.includes(specifier)
-          ) {
+          if (!recursive && !specifiers.includes(specifier)) {
             return {
               kind: "external",
               specifier,
@@ -36,7 +31,7 @@ export function createGraphLocally(
           }
           return await defaultLoad(specifier);
         default:
-          throw new Error(`Unsupported protocol: ${url.protocol}`);
+          throw new Error(`Unexpected protocol: ${url.protocol}`);
       }
     },
     ...options,
