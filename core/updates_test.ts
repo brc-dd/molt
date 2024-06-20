@@ -4,7 +4,7 @@ import {
   assertExists,
   assertObjectMatch,
 } from "@std/assert";
-import { collect } from "./update.ts";
+import { collect } from "./updates.ts";
 import { LatestVersionStub } from "../test/mock.ts";
 
 Deno.test("collect - deno.jsonc", async () => {

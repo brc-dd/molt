@@ -8,10 +8,12 @@
     "include": [
       "deno.json",
       "*.ts",
+      "deno_lockfile/js",
       "import_map/js"
     ],
     "exclude": [
       "*_test.ts",
+      "!deno_lockfile/js",
       "!import_map/js"
     ]
   }

@@ -5,7 +5,6 @@ import {
   type Lockfile,
   type LockfileJson,
 } from "./deno_lockfile/js/mod.ts";
-import { DependencyUpdate } from "./update.ts";
 import { createGraph } from "@deno/graph";
 
 export type { Lockfile, LockfileJson };
@@ -18,7 +17,7 @@ const { parseFromJson } = await instantiate();
  * @param path - The URL or path to the lockfile.
  * @returns The `Lockfile` object abstracting the lockfile.
  */
-export async function readLockFile(
+export async function readLockfile(
   path: URL | string,
 ): Promise<Lockfile> {
   path = toPath(path);
@@ -73,7 +72,7 @@ export async function extractRemote(
 /**
  * Create a new lockfile with the dependencies updated.
  */
-export async function recreate(
+export async function collectLockfileUpdates(
   lockfile: LockfileJson,
 ): Promise<LockfileJson> {
 }

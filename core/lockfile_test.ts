@@ -7,7 +7,7 @@ import {
   readLockfile,
 } from "./lockfile.ts";
 
-describe("readLockFile", () => {
+describe("readLockfile", () => {
   it("should read a lockfile", async () => {
     const lockfile = await readLockfile(
       new URL("../test/fixtures/deno.lock", import.meta.url),

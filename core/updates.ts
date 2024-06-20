@@ -134,14 +134,14 @@ export interface CollectOptions {
  * @returns The list of dependencies.
  *
  * @example
- * ```ts
+ * ```typescript
  * collect("mod.ts")
- * // -> Collect dependencies from mod.ts and its local submodules.
+ * // -> Collect updates to the dependencies from mod.ts and its local submodules.
  * ```
  * @example
- * ```ts
+ * ```typescript
  * collect("deno.json")
- * // -> Collect dependencies from the import map specified in deno.json
+ * // -> Collect updates to the dependencies from the import map specified in deno.json
  * ```
  */
 export async function collect(
@@ -161,7 +161,7 @@ export async function collect(
 
   const graph = await createGraphLocally(esms, {
     resolve: importMap?.resolveInner,
-    resolveLocal: options.resolveLocal ??= true,
+    recursive: options.resolveLocal ??= true,
   });
 
   const _options: CheckOptions = { cache: true, ...options, importMap };

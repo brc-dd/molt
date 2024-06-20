@@ -6,7 +6,7 @@ import {
 
 export function createGraphLocally(
   specifiers: string[],
-  options?: CreateGraphOptions & { resolveLocal?: boolean },
+  options?: CreateGraphOptions & { recursive?: boolean },
 ) {
   return createGraph(specifiers, {
     load: async (specifier) => {
@@ -27,7 +27,7 @@ export function createGraphLocally(
           };
         case "file:":
           if (
-            options?.resolveLocal === false && !specifiers.includes(specifier)
+            options?.recursive === false && !specifiers.includes(specifier)
           ) {
             return {
               kind: "external",
