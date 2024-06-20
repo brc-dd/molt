@@ -7,7 +7,7 @@ import { collectFromEsModules, collectFromImportMap } from "./dependencies.ts";
 
 describe("collectFromEsModules", () => {
   beforeEach(() => {
-    fs.stub(".", { readThrough: false });
+    fs.stub(".");
     fs.mock();
   });
 
@@ -31,7 +31,8 @@ describe("collectFromEsModules", () => {
         name: "@std/assert",
         version: "0.222.0",
         entrypoint: "",
-        referrer: {
+        source: {
+          type: "module",
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
             start: { line: 0, character: 23 },
@@ -45,7 +46,8 @@ describe("collectFromEsModules", () => {
         name: "deno.land/std",
         version: "0.222.0",
         entrypoint: "/bytes/copy.ts",
-        referrer: {
+        source: {
+          type: "module",
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
             start: { line: 1, character: 21 },
@@ -77,7 +79,8 @@ describe("collectFromEsModules", () => {
         name: "@std/assert",
         version: "0.222.0",
         entrypoint: "",
-        referrer: {
+        source: {
+          type: "module",
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
             start: { line: 0, character: 23 },
@@ -91,7 +94,8 @@ describe("collectFromEsModules", () => {
         protocol: "https:",
         version: "0.222.0",
         entrypoint: "/bytes/copy.ts",
-        referrer: {
+        source: {
+          type: "module",
           url: "file://" + join(Deno.cwd(), "b.ts"),
           span: {
             start: { line: 0, character: 21 },
@@ -130,7 +134,7 @@ describe("collectFromImportMap", () => {
       dedent`
         {
           "imports": {
-            "@std/assert": "jsr:@std/assert@0.222.0",
+            "@std/assert": "jsr:@std/assert@^0.222.0",
           }
         }
       `,
@@ -138,14 +142,15 @@ describe("collectFromImportMap", () => {
     const actual = await collectFromImportMap("a.json");
     assertEquals(actual, [
       {
-        specifier: "jsr:@std/assert@0.222.0",
+        specifier: "jsr:@std/assert@^0.222.0",
         protocol: "jsr:",
         name: "@std/assert",
-        version: "0.222.0",
+        version: "^0.222.0",
         entrypoint: "",
-        referrer: {
+        source: {
+          type: "import_map",
           url: "file://" + join(Deno.cwd(), "a.json"),
-          span: undefined,
+          key: "@std/assert",
         },
       },
     ]);

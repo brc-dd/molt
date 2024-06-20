@@ -102,21 +102,27 @@ export function hasVersionRange(
 export type SourceType = "import_map" | "lockfile" | "module";
 export type RangeJson = NonNullable<DependencyJson["code"]>["span"];
 
-export interface DependencyReferrer<S extends SourceType> {
+export type DependencySource<T extends SourceType> = {
+  /** The type of the source of the dependency. */
+  type: T;
   /** The full path to the module that imports the dependency.
    * @example "file:///path/to/mod.ts" */
   url: string;
-  /** The range of the dependency specifier in the source code. */
-  span: S extends "module" ? RangeJson : undefined;
-}
+} & DependencySourceLocator<T>;
+
+export type DependencySourceLocator<
+  T extends SourceType,
+> = T extends "module" ? { span: RangeJson }
+  : T extends "import_map" ? { key: string }
+  : {};
 
 export interface Dependency<
-  S extends SourceType = SourceType,
+  T extends SourceType = SourceType,
 > extends DependencyComps {
   /** The original specifier of the dependency appeared in the code. */
   specifier: string;
-  /** Information about the referrer of the dependency. */
-  referrer: DependencyReferrer<S>;
+  /** Information about the source of the dependency. */
+  source: DependencySource<T>;
 }
 
 export interface CollectFromModuleOptions {
@@ -133,11 +139,11 @@ export interface CollectFromModuleOptions {
 export async function collectFromEsModules(
   paths: string | URL | (string | URL)[],
   options: CollectFromModuleOptions = {},
-) {
+): Promise<Dependency<"module">[]> {
   const urls = [paths].flat().map(toUrl);
   const graph = await createGraphLocally(urls, options);
 
-  const deps: Dependency[] = [];
+  const deps: Dependency<"module">[] = [];
   graph.modules.forEach((mod) =>
     mod.dependencies?.forEach((json) => {
       const dep = fromDependencyJson(json, mod.specifier);
@@ -150,7 +156,7 @@ export async function collectFromEsModules(
 function fromDependencyJson(
   json: DependencyJson,
   referrer: string,
-): Dependency | undefined {
+): Dependency<"module"> | undefined {
   const specifier = json.specifier;
   const url = json.code?.specifier ?? json.type?.specifier;
   const { span } = json.code ?? json.type ?? {};
@@ -158,7 +164,7 @@ function fromDependencyJson(
     return {
       specifier,
       ...parse(url),
-      referrer: { url: referrer, span },
+      source: { type: "module", url: referrer, span },
     };
   }
 }
@@ -169,12 +175,14 @@ function fromDependencyJson(
  */
 export async function collectFromImportMap(
   path: string | URL,
-): Promise<Dependency[]> {
+): Promise<Dependency<"import_map">[]> {
   const url = toUrl(path);
   const json = await readImportMapJson(path);
-  return Object.values(json.imports).map((specifier) => ({
+  return Object.entries(json.imports).map((
+    [key, specifier],
+  ): Dependency<"import_map"> => ({
     specifier,
     ...parse(specifier),
-    referrer: { url, span: undefined },
+    source: { type: "import_map", url, key },
   })).sort((a, b) => a.name.localeCompare(b.name));
 }

@@ -1,4 +1,4 @@
-import { parse as parseJsonc } from "@std/jsonc";
+import * as Jsonc from "@std/jsonc";
 import { ensure, is } from "@core/unknownutil";
 
 export interface ImportMapJson {
@@ -15,7 +15,7 @@ const isImportMapJson = is.ObjectOf({
 export function parseImportMapJson(
   src: string,
 ): ImportMapJson {
-  return ensure(parseJsonc(src), isImportMapJson);
+  return ensure(Jsonc.parse(src), isImportMapJson);
 }
 
 /**
