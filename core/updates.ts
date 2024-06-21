@@ -1,14 +1,14 @@
 import { ensure, is } from "@core/unknownutil";
 import * as SemVer from "@std/semver";
-import { type Dependency, parse, stringify } from "./dependency.ts";
-import { filterValues, mapNotNullish } from "@std/collections";
+import { type Dependency, parse, stringify } from "./deps.ts";
+import { filterValues, mapNotNullish, maxWith } from "@std/collections";
 
 export interface DependencyUpdate {
   /** The latest version available, including pre-releases or whatever. */
   latest: string;
-  /** The latest SemVer that satisfies the constraint. */
+  /** The latest version that satisfies the constraint. */
   constrainted?: string;
-  /** The latest SemVer that is not a pre-release */
+  /** The latest version that is not a pre-release */
   released?: string;
 }
 
@@ -32,7 +32,7 @@ export function getUpdate(
   switch (dep.protocol) {
     case "http:":
     case "https:":
-      return getRemoteUpdate(dep as Dependency<"http" | "https">);
+      return getRemoteUpdate(dep as Dependency<"remote">);
     case "jsr:":
     case "npm:":
       return getPackageUpdate(dep as Dependency<"jsr" | "npm">);
@@ -40,27 +40,31 @@ export function getUpdate(
 }
 
 async function getRemoteUpdate(
-  dep: Dependency<"http" | "https">,
+  dep: Dependency<"remote">,
 ): Promise<DependencyUpdate | undefined> {
   const latest = await getRemoteLatestVersion(dep);
-  if (latest && latest !== dep.version) {
+  if (latest) {
     const semver = SemVer.tryParse(latest);
-    const released = semver?.prerelease?.length
-      ? SemVer.format(semver)
-      : undefined;
-    return { latest, released };
+    if (semver) {
+      const released = !semver.prerelease?.length
+        ? SemVer.format(semver)
+        : undefined;
+      return { latest, released };
+    }
+    return { latest };
   }
 }
 
 async function getRemoteLatestVersion(
-  dep: Dependency<"http" | "https">,
+  dep: Dependency<"remote">,
 ): Promise<string | undefined> {
-  const res = await fetch(stringify(dep), { method: "HEAD" });
-  assertOk(res);
+  const url = stringify(dep, { version: false });
+  const res = await fetch(url, { method: "HEAD" });
 
   // We don't need the body, just the headers.
   await res.arrayBuffer();
 
+  // We expect a redirect to the latest version.
   if (!res.redirected) {
     return;
   }
@@ -73,20 +77,38 @@ async function getPackageUpdate(
   const versions = await getVersions(dep);
   const semvers = mapNotNullish(versions, SemVer.tryParse);
 
-  const range = dep.version ? SemVer.tryParseRange(dep.version) : undefined;
-  const constrainted = range ? SemVer.maxSatisfying(semvers, range) : undefined;
+  const latest = maxWith(semvers, SemVer.compare);
+  if (!latest) return;
+
+  const releases = semvers.filter((it) => !it.prerelease?.length);
+  const released = maxWith(releases, SemVer.compare);
+
+  if (!dep.version) {
+    return {
+      latest: SemVer.format(latest),
+      released: released && SemVer.format(released),
+    };
+  }
+
+  const range = SemVer.tryParseRange(dep.version);
+  const constrainted = range && SemVer.maxSatisfying(semvers, range);
+  return {
+    latest: SemVer.format(latest),
+    constrainted: constrainted && SemVer.format(constrainted),
+    released: released && SemVer.format(released),
+  };
 }
 
 function getVersions(dep: Dependency<"jsr" | "npm">): Promise<string[]> {
   switch (dep.protocol) {
     case "npm:":
-      return getNpmReleases(dep as Dependency<"npm">);
+      return getNpmVersions(dep as Dependency<"npm">);
     case "jsr:":
-      return getJsrReleases(dep as Dependency<"jsr">);
+      return getJsrVersions(dep as Dependency<"jsr">);
   }
 }
 
-async function getNpmReleases(dep: Dependency<"npm">): Promise<string[]> {
+async function getNpmVersions(dep: Dependency<"npm">): Promise<string[]> {
   const res = await fetch(
     `https://registry.npmjs.org/${dep.name}`,
   );
@@ -101,7 +123,7 @@ async function getNpmReleases(dep: Dependency<"npm">): Promise<string[]> {
   return Object.keys(meta.versions);
 }
 
-async function getJsrReleases(dep: Dependency<"jsr">): Promise<string[]> {
+async function getJsrVersions(dep: Dependency<"jsr">): Promise<string[]> {
   const res = await fetch(
     `https://jsr.io/${dep.name}/meta.json`,
   );
@@ -114,16 +136,6 @@ async function getJsrReleases(dep: Dependency<"jsr">): Promise<string[]> {
   });
   const meta = ensure(await res.json(), isJsrPackageMeta);
   return Object.keys(filterValues(meta.versions, (it) => !it.yanked));
-}
-
-/** Find the latest non-pre-release version from the given list of versions. */
-function findLatest(versions: string[]): string | undefined {
-  const latest = mapNotNullish(versions, SemVer.tryParse)
-    .filter((semver) => !semver.prerelease?.length)
-    .sort(SemVer.compare).reverse().at(0);
-  if (latest) {
-    return SemVer.format(latest);
-  }
 }
 
 function assertOk(res: Response): void {

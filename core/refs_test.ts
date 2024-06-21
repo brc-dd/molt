@@ -118,9 +118,7 @@ describe("collectFromImportMap", () => {
     fs.mock();
   });
 
-  afterEach(() => {
-    fs.dispose();
-  });
+  afterEach(() => fs.dispose());
 
   it("should collect dependencies from an import map", async () => {
     await Deno.writeTextFile(

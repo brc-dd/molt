@@ -89,6 +89,16 @@ describe("stringify", () => {
       "deno.land/std@0.1.0",
     ));
 
+  it("without version", () =>
+    assertEquals(
+      stringify({
+        protocol: "https:",
+        name: "deno.land/std",
+        version: "0.1.0",
+      }, { version: false }),
+      "https://deno.land/std",
+    ));
+
   it("name only", () =>
     assertEquals(
       stringify({
