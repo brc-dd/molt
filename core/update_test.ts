@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
-import { getUpdate } from "./updates.ts";
+import { stub } from "@std/testing/mock";
+import { getUpdate } from "./update.ts";
 import { parse } from "./dependency.ts";
 
 describe("getLatestVersion", () => {

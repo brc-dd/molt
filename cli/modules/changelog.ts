@@ -7,11 +7,11 @@ import {
   resolvePackageRoot,
   resolveRepository,
 } from "@molt/integration";
-import type { Dependency, UpdatedDependency } from "@molt/core";
+import type { DependencyReference, UpdatedDependency } from "@molt/core";
 
 export default async function (
   updated: UpdatedDependency,
-  froms: Dependency[],
+  froms: DependencyReference[],
   options: {
     changelog?: true | string[];
   },

@@ -1,5 +1,5 @@
 import { match, placeholder as _ } from "@core/match";
-import type { Dependency } from "@molt/core";
+import type { DependencyReference } from "@molt/core";
 import type { Repository } from "./repository.ts";
 import * as github from "./github.ts";
 
@@ -129,7 +129,7 @@ export function is(str: string, pkg: Package): boolean {
  * fromDependency(dependency); // { registry: "jsr", scope: "molt", name: "core" }
  * ```
  */
-export function fromDependency(dependency: Dependency): Package | undefined {
+export function fromDependency(dependency: DependencyReference): Package | undefined {
   const { protocol, name } = dependency;
   return tryParse(protocol + name);
 }

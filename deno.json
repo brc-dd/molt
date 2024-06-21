@@ -47,8 +47,7 @@
     }
   },
   "exclude": [
-    "core/deno_lockfile",
-    "core/import_map"
+    "core/deno_lockfile"
   ],
   "workspaces": [
     "cli",

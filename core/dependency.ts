@@ -5,17 +5,27 @@ import * as SemVer from "@std/semver";
 import { createGraphLocally } from "./graph.ts";
 import { readImportMapJson } from "./import_map.ts";
 
+type DependencyProtocolName = "jsr" | "npm" | "http" | "https";
+export type DependencyProtocol = `${DependencyProtocolName}:`;
+
+const isDependencyProtocol = (
+  protocol: string,
+): protocol is DependencyProtocol =>
+  ["jsr:", "npm:", "http:", "https:"].includes(protocol);
+
 /** Parsed components of a dependency specifier. */
-export interface DependencyComps {
+export interface Dependency<
+  P extends DependencyProtocolName = DependencyProtocolName,
+> {
   /** The URL protocol of the dependency specifier.
-   * @example "https:", "jsr:", "npm:" */
-  protocol: string;
+   * @example "jsr:", "npm:", "https:" */
+  protocol: `${P}:`;
   /** The name of the dependency, or a string between the protocol and version.
    * @example "deno.land/std" */
   name: string;
   /** The version string of the dependency.
    * @example "0.205.0" */
-  version?: string;
+  version: SemVer.SemVer;
   /** The subpath of the dependency.
    * @example "/fs/mod.ts", "/bdd", "" */
   entrypoint: string;
@@ -29,39 +39,38 @@ export interface DependencyComps {
  * );
  * // -> { protocol: "https:", name: "deno.land/std", version: "0.200.0", path: "/fs/mod.ts" }
  */
-export function parse(url: string | URL): DependencyComps {
+export function parse(url: string | URL): Dependency {
   url = new URL(url);
   const protocol = url.protocol;
+  if (!isDependencyProtocol(protocol)) {
+    throw new Error(`Invalid protocol: ${protocol}`);
+  }
   const body = url.hostname + url.pathname;
-
   // Try to find a path segment like "<name>@<version>/"
   const matched = body.match(
     /^(?<name>.+)@(?<version>[^/]+)(?<entrypoint>\/.*)?$/,
   );
-
-  if (matched) {
-    assertExists(matched.groups);
-    const { name, entrypoint, version } = matched.groups;
-    return {
-      protocol,
-      // jsr specifier may have a leading slash. e.g. jsr:/@std/testing^0.222.0/bdd
-      name: name.startsWith("/") ? name.slice(1) : name,
-      version,
-      entrypoint: entrypoint ?? "",
-    };
+  if (!matched) {
+    throw new Error(`Unsupported format of dependency specifier: ${url}`);
   }
-  return { protocol, name: body, entrypoint: "" };
+  assertExists(matched.groups);
+  const { name, entrypoint, version } = matched.groups;
+  return {
+    protocol,
+    // jsr specifier may have a leading slash. e.g. jsr:/@std/testing^0.222.0/bdd
+    name: name.startsWith("/") ? name.slice(1) : name,
+    version: SemVer.parse(version),
+    entrypoint: entrypoint ?? "",
+  };
 }
 
-/** Convert the given protocol to a full URL scheme. */
-function addSeparator(protocol: string): string {
-  switch (protocol) {
-    case "file:":
-    case "http:":
-    case "https:":
-      return protocol + "//";
-    default:
-      return protocol;
+/** Try parsing the given URL as a dependency specifier.
+ * @returns The parsed dependency, or `undefined` if the URL is invalid. */
+export function tryParse(url: string | URL): Dependency | undefined {
+  try {
+    return parse(url);
+  } catch {
+    return;
   }
 }
 
@@ -76,28 +85,26 @@ function addSeparator(protocol: string): string {
  * }); // -> "https://deno.land/std@1.0.0/fs/mod.ts"
  */
 export function stringify(
-  dependency: DependencyComps,
+  dependency: Dependency,
   include: { protocol?: boolean; version?: boolean; path?: boolean } = {},
 ): string {
   include = { protocol: true, version: true, path: true, ...include };
-
-  const header = include.protocol ? addSeparator(dependency.protocol) : "";
+  const toHeader = (protocol: string) => {
+    switch (protocol) {
+      case "http:":
+      case "https:":
+        return protocol + "//";
+      default:
+        return protocol;
+    }
+  };
+  const header = include.protocol ? toHeader(dependency.protocol) : "";
   const version = include.version
     ? dependency.version ? "@" + dependency.version : ""
     : "";
   const path = include.path ? dependency.entrypoint : "";
 
   return `${header}${dependency.name}${version}` + path;
-}
-
-/** Check if the given dependency has a version range. */
-export function hasVersionRange(
-  dependency: DependencyComps,
-): boolean {
-  const constraint = dependency.version
-    ? SemVer.tryParseRange(dependency.version)
-    : undefined;
-  return !!constraint && constraint.flat().length > 1;
 }
 
 /** Type of the source of the dependency. */
@@ -122,10 +129,10 @@ export type DependencySourceLocator<
   : T extends "import_map" ? { key: string }
   : never;
 
-/** Representation of a dependency found in the source code or an import map. */
-export interface Dependency<
+/** Representation of a reference to a dependency. */
+export interface DependencyReference<
   T extends SourceType = SourceType,
-> extends DependencyComps {
+> extends Dependency {
   /** The original specifier of the dependency appeared in the code. */
   specifier: string;
   /** Information about the source of the dependency. */
@@ -146,11 +153,11 @@ export interface CollectFromModuleOptions {
 export async function collectFromEsModules(
   paths: string | URL | (string | URL)[],
   options: CollectFromModuleOptions = {},
-): Promise<Dependency<"module">[]> {
+): Promise<DependencyReference<"module">[]> {
   const urls = [paths].flat().map(toUrl);
   const graph = await createGraphLocally(urls, options);
 
-  const deps: Dependency<"module">[] = [];
+  const deps: DependencyReference<"module">[] = [];
   graph.modules.forEach((mod) =>
     mod.dependencies?.forEach((json) => {
       const dep = fromDependencyJson(json, mod.specifier);
@@ -163,7 +170,7 @@ export async function collectFromEsModules(
 function fromDependencyJson(
   json: DependencyJson,
   referrer: string,
-): Dependency<"module"> | undefined {
+): DependencyReference<"module"> | undefined {
   const specifier = json.specifier;
   const url = json.code?.specifier ?? json.type?.specifier;
   const { span } = json.code ?? json.type ?? {};
@@ -183,104 +190,14 @@ const compareNames = (a: Dependency, b: Dependency) =>
  * file, sorted lexically by name. */
 export async function collectFromImportMap(
   path: string | URL,
-): Promise<Dependency<"import_map">[]> {
+): Promise<DependencyReference<"import_map">[]> {
   const url = toUrl(path);
   const json = await readImportMapJson(path);
   return Object.entries(json.imports).map((
     [key, specifier],
-  ): Dependency<"import_map"> => ({
+  ): DependencyReference<"import_map"> => ({
     specifier,
     ...parse(specifier),
     source: { type: "import_map", url, key },
   })).sort(compareNames);
-}
-
-/**
- * Try resolving the latest version of the given dependency.
- *
- * @returns The latest version of the given dependency, or `undefined` if the
- * latest version of dependency is unable to resolve.
- *
- * @throws An error if the dependency is not found in the registry.
- *
- * @example
- * await resolveLatestVersion(
- *   Dependency.parse(new URL("https://deno.land/std@0.220.0/bytes/copy.ts"))
- * );
- * // -> "0.224.0"
- */
-export async function getLatestVersion(
-  dependency: Dependency,
-): Promise<string | undefined> {
-  const releases = await getReleases(dependency);
-  return findLatest(releases);
-}
-
-async function getReleases(dependency: Dependency): Promise<string[]> {
-  switch (dependency.protocol) {
-    case "npm:":
-      return getNpmReleases(dependency);
-    case "jsr:":
-      return getJsrReleases(dependency);
-  }
-  const latest = await getRemoteLatestVersion(dependency);
-  return latest ? [latest] : [];
-}
-
-async function getNpmReleases(dependency: Dependency): Promise<string[]> {
-  const res = await fetch(
-    `https://registry.npmjs.org/${dependency.name}`,
-  );
-  if (!res.ok) {
-    throw new Deno.errors.Http(`${res.statusText}: ${res.url}`);
-  }
-  const isNpmPackageMeta = is.ObjectOf({
-    versions: is.RecordOf(
-      is.ObjectOf({ version: is.String }),
-      is.String,
-    ),
-  });
-  const meta = ensure(await res.json(), isNpmPackageMeta);
-  return Object.keys(meta.versions);
-}
-
-async function getJsrReleases(dependency: Dependency): Promise<string[]> {
-  const res = await fetch(
-    `https://jsr.io/${dependency.name}/meta.json`,
-  );
-  if (!res.ok) {
-    throw new Deno.errors.Http(`${res.statusText}: ${dependency.name}`);
-  }
-  const isJsrPackageMeta = is.ObjectOf({
-    versions: is.RecordOf(
-      is.ObjectOf({ yanked: is.OptionalOf(is.LiteralOf(true)) }),
-      is.String,
-    ),
-  });
-  const meta = ensure(await res.json(), isJsrPackageMeta);
-  return Object.keys(filterValues(meta.versions, (it) => !it.yanked));
-}
-
-async function getRemoteLatestVersion(
-  dependency: Dependency,
-): Promise<string | undefined> {
-  const response = await fetch(stringify(dependency), { method: "HEAD" });
-
-  // We don't need the body, just the headers.
-  await response.arrayBuffer();
-
-  if (!response.redirected) {
-    return;
-  }
-  return parse(response.url).version;
-}
-
-/** Find the latest non-pre-release version from the given list of versions. */
-function findLatest(versions: string[]): string | undefined {
-  const latest = mapNotNullish(versions, SemVer.tryParse)
-    .filter((semver) => !semver.prerelease)
-    .sort(SemVer.compare).reverse().at(0);
-  if (latest) {
-    return SemVer.format(latest);
-  }
 }

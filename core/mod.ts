@@ -32,7 +32,7 @@
  */
 
 export {
-  type Dependency,
+  type DependencyReference,
   parse,
   resolveLatestVersion,
   stringify,
