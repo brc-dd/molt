@@ -5,6 +5,7 @@ import * as SemVer from "@std/semver";
 import { createGraphLocally } from "./graph.ts";
 import { readImportMapJson } from "./import_map.ts";
 
+/** Parsed components of a dependency specifier. */
 export interface DependencyComps {
   /** The URL protocol of the dependency specifier.
    * @example "https:", "jsr:", "npm:" */
@@ -99,9 +100,13 @@ export function hasVersionRange(
   return !!constraint && constraint.flat().length > 1;
 }
 
-export type SourceType = "import_map" | "lockfile" | "module";
+/** Type of the source of the dependency. */
+export type SourceType = "module" | "import_map";
+
+/** Span of the dependency in the source code. */
 export type RangeJson = NonNullable<DependencyJson["code"]>["span"];
 
+/** Information about the source of the dependency. */
 export type DependencySource<T extends SourceType> = {
   /** The type of the source of the dependency. */
   type: T;
@@ -110,12 +115,14 @@ export type DependencySource<T extends SourceType> = {
   url: string;
 } & DependencySourceLocator<T>;
 
+/** Locator of the source of the dependency. */
 export type DependencySourceLocator<
   T extends SourceType,
 > = T extends "module" ? { span: RangeJson }
   : T extends "import_map" ? { key: string }
-  : {};
+  : never;
 
+/** Representation of a dependency found in the source code or an import map. */
 export interface Dependency<
   T extends SourceType = SourceType,
 > extends DependencyComps {
@@ -169,10 +176,8 @@ function fromDependencyJson(
   }
 }
 
-/**
- * Collect dependencies from the given import map file, or a Deno configuration
- * file, sorted lexically by name.
- */
+/** Collect dependencies from the given import map file, or a Deno configuration
+ * file, sorted lexically by name. */
 export async function collectFromImportMap(
   path: string | URL,
 ): Promise<Dependency<"import_map">[]> {

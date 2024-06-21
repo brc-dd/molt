@@ -135,6 +135,7 @@ describe("collectFromImportMap", () => {
         {
           "imports": {
             "@std/assert": "jsr:@std/assert@^0.222.0",
+            "@std/testing/bdd": "jsr:@std/testing@^0.222.0/bdd",
           }
         }
       `,
@@ -151,6 +152,18 @@ describe("collectFromImportMap", () => {
           type: "import_map",
           url: "file://" + join(Deno.cwd(), "a.json"),
           key: "@std/assert",
+        },
+      },
+      {
+        specifier: "jsr:@std/testing@^0.222.0/bdd",
+        protocol: "jsr:",
+        name: "@std/testing",
+        version: "^0.222.0",
+        entrypoint: "/bdd",
+        source: {
+          type: "import_map",
+          url: "file://" + join(Deno.cwd(), "a.json"),
+          key: "@std/testing/bdd",
         },
       },
     ]);

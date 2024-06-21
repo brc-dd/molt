@@ -5,17 +5,16 @@ export interface ImportMapJson {
   imports: Record<string, string>;
 }
 
-const isImportMapJson = is.ObjectOf({
-  imports: is.RecordOf(is.String),
-});
-
 /**
  * Parse an import map from the given JSON string.
  */
 export function parseImportMapJson(
   src: string,
 ): ImportMapJson {
-  return ensure(Jsonc.parse(src), isImportMapJson);
+  return ensure(
+    Jsonc.parse(src),
+    is.ObjectOf({ imports: is.RecordOf(is.String) }),
+  );
 }
 
 /**
