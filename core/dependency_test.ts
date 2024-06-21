@@ -1,303 +1,169 @@
-import { afterAll, beforeAll, describe, it } from "@std/testing/bdd";
-import { assertEquals, assertExists, assertObjectMatch } from "@std/assert";
-import {
-  isPreRelease,
-  parse,
-  resolveLatestVersion,
-  stringify,
-} from "./dependency.ts";
-import { LatestVersionStub } from "../test/mock.ts";
+import * as fs from "@chiezo/amber/fs";
+import { assert, assertEquals } from "@std/assert";
+import { join } from "@std/path";
+import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
+import dedent from "dedent";
+import { collectFromEsModules, collectFromImportMap } from "./dependency.ts";
 
-describe("parse", () => {
-  it("deno.land/std", () =>
-    assertObjectMatch(
-      parse(
-        new URL("https://deno.land/std@0.1.0/version.ts"),
-      ),
+describe("collectFromEsModules", () => {
+  beforeEach(() => {
+    fs.stub(".");
+    fs.mock();
+  });
+
+  afterEach(() => fs.dispose());
+
+  it("should collect dependencies from a ES module", async () => {
+    await Deno.writeTextFile(
+      "a.ts",
+      dedent`
+        import { assert } from "jsr:@std/assert@0.222.0";
+        import { copy } from "https://deno.land/std@0.222.0/bytes/copy.ts";
+      `,
+    );
+    const actual = await collectFromEsModules("a.ts");
+    assertEquals(actual, [
       {
+        specifier: "jsr:@std/assert@0.222.0",
+        protocol: "jsr:",
+        name: "@std/assert",
+        version: "0.222.0",
+        entrypoint: "",
+        source: {
+          type: "module",
+          url: "file://" + join(Deno.cwd(), "a.ts"),
+          span: {
+            start: { line: 0, character: 23 },
+            end: { line: 0, character: 48 },
+          },
+        },
+      },
+      {
+        specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
+        protocol: "https:",
         name: "deno.land/std",
-        version: "0.1.0",
-        path: "/version.ts",
+        version: "0.222.0",
+        entrypoint: "/bytes/copy.ts",
+        source: {
+          type: "module",
+          url: "file://" + join(Deno.cwd(), "a.ts"),
+          span: {
+            start: { line: 1, character: 21 },
+            end: { line: 1, character: 66 },
+          },
+        },
       },
-    ));
+    ]);
+  });
 
-  it("deno.land/std (no semver)", () =>
-    assertObjectMatch(
-      parse(
-        new URL("https://deno.land/std/version.ts"),
-      ),
+  it("should collect dependencies from multiple ES modules", async () => {
+    await Deno.writeTextFile(
+      "a.ts",
+      dedent`
+        import { assert } from "jsr:@std/assert@0.222.0";
+      `,
+    );
+    await Deno.writeTextFile(
+      "b.ts",
+      dedent`
+        import { copy } from "https://deno.land/std@0.222.0/bytes/copy.ts";
+      `,
+    );
+    const actual = await collectFromEsModules(["a.ts", "b.ts"]);
+    assertEquals(actual, [
       {
-        name: "deno.land/std/version.ts",
+        specifier: "jsr:@std/assert@0.222.0",
+        protocol: "jsr:",
+        name: "@std/assert",
+        version: "0.222.0",
+        entrypoint: "",
+        source: {
+          type: "module",
+          url: "file://" + join(Deno.cwd(), "a.ts"),
+          span: {
+            start: { line: 0, character: 23 },
+            end: { line: 0, character: 48 },
+          },
+        },
       },
-    ));
-
-  it("deno.land/x/ (with a leading 'v')", () =>
-    assertObjectMatch(
-      parse(
-        new URL("https://deno.land/x/hono@v0.1.0"),
-      ),
       {
-        name: "deno.land/x/hono",
-        version: "v0.1.0",
-        path: "",
+        specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
+        name: "deno.land/std",
+        protocol: "https:",
+        version: "0.222.0",
+        entrypoint: "/bytes/copy.ts",
+        source: {
+          type: "module",
+          url: "file://" + join(Deno.cwd(), "b.ts"),
+          span: {
+            start: { line: 0, character: 21 },
+            end: { line: 0, character: 66 },
+          },
+        },
       },
-    ));
+    ]);
+  });
 
-  it("npm:", () =>
-    assertObjectMatch(
-      parse(
-        new URL("npm:node-emoji@1.0.0"),
-      ),
+  it("should ignore dependencies which are supposed to be mapped with import maps", async () => {
+    await Deno.writeTextFile(
+      "a.ts",
+      dedent`
+        import { assert } from "@std/assert";
+      `,
+    );
+    const actual = await collectFromEsModules("a.ts");
+    assert(actual.length === 0);
+  });
+});
+
+describe("collectFromImportMap", () => {
+  beforeEach(() => {
+    fs.stub(".");
+    fs.mock();
+  });
+
+  afterEach(() => {
+    fs.dispose();
+  });
+
+  it("should collect dependencies from an import map", async () => {
+    await Deno.writeTextFile(
+      "a.json",
+      dedent`
+        {
+          "imports": {
+            "@std/assert": "jsr:@std/assert@^0.222.0",
+            "@std/testing/bdd": "jsr:@std/testing@^0.222.0/bdd",
+          }
+        }
+      `,
+    );
+    const actual = await collectFromImportMap("a.json");
+    assertEquals(actual, [
       {
-        name: "node-emoji",
-        version: "1.0.0",
-        path: "",
+        specifier: "jsr:@std/assert@^0.222.0",
+        protocol: "jsr:",
+        name: "@std/assert",
+        version: "^0.222.0",
+        entrypoint: "",
+        source: {
+          type: "import_map",
+          url: "file://" + join(Deno.cwd(), "a.json"),
+          key: "@std/assert",
+        },
       },
-    ));
-
-  it("cdn.jsdelivr.net/gh", () =>
-    assertObjectMatch(
-      parse(
-        new URL("https://cdn.jsdelivr.net/gh/hasundue/molt@e4509a9/mod.ts"),
-      ),
       {
-        name: "cdn.jsdelivr.net/gh/hasundue/molt",
-        version: "e4509a9",
-        path: "/mod.ts",
-      },
-    ));
-
-  it("jsr:", () =>
-    assertObjectMatch(
-      parse(new URL("jsr:@luca/flag@^1.0.0/flag.ts")),
-      {
-        name: "@luca/flag",
-        version: "^1.0.0",
-        path: "/flag.ts",
-      },
-    ));
-
-  it("jsr - extended", () =>
-    assertObjectMatch(
-      parse(new URL("jsr:/@std/testing@^1.0.0/bdd")),
-      {
+        specifier: "jsr:@std/testing@^0.222.0/bdd",
+        protocol: "jsr:",
         name: "@std/testing",
-        version: "^1.0.0",
-        path: "/bdd",
+        version: "^0.222.0",
+        entrypoint: "/bdd",
+        source: {
+          type: "import_map",
+          url: "file://" + join(Deno.cwd(), "a.json"),
+          key: "@std/testing/bdd",
+        },
       },
-    ));
-});
-
-describe("stringify", () => {
-  it("full", () =>
-    assertEquals(
-      stringify({
-        protocol: "https:",
-        name: "deno.land/std",
-        version: "0.1.0",
-        path: "/version.ts",
-      }),
-      "https://deno.land/std@0.1.0/version.ts",
-    ));
-
-  it("no version", () =>
-    assertEquals(
-      stringify({
-        protocol: "https:",
-        name: "deno.land/std",
-        path: "/version.ts",
-      }, { version: false }),
-      "https://deno.land/std/version.ts",
-    ));
-
-  it("no path", () =>
-    assertEquals(
-      stringify({
-        protocol: "https:",
-        name: "deno.land/std",
-        version: "0.1.0",
-        path: "/version.ts",
-      }, { path: false }),
-      "https://deno.land/std@0.1.0",
-    ));
-
-  it("no protocol", () =>
-    assertEquals(
-      stringify({
-        protocol: "https:",
-        name: "deno.land/std",
-        version: "0.1.0",
-        path: "/version.ts",
-      }, { protocol: false }),
-      "deno.land/std@0.1.0/version.ts",
-    ));
-
-  it("name only", () =>
-    assertEquals(
-      stringify({
-        protocol: "https:",
-        name: "deno.land/std",
-        version: "0.1.0",
-        path: "/version.ts",
-      }, { protocol: false, version: false, path: false }),
-      "deno.land/std",
-    ));
-});
-
-Deno.test("isPreRelease", () => {
-  assertEquals(
-    isPreRelease("0.1.0"),
-    false,
-  );
-  assertEquals(
-    isPreRelease("0.1.0-alpha.1"),
-    true,
-  );
-  assertEquals(
-    isPreRelease("0.1.0-rc.1"),
-    true,
-  );
-});
-
-describe("resolveLatestVersion", () => {
-  const LATEST = "123.456.789";
-  let stub: LatestVersionStub;
-
-  beforeAll(() => {
-    stub = LatestVersionStub.create(LATEST);
+    ]);
   });
-
-  afterAll(() => {
-    stub.restore();
-  });
-
-  it("https://deno.land/std/version.ts", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("https://deno.land/std/version.ts")),
-    );
-    assertExists(updated);
-    assertObjectMatch(updated, {
-      name: "deno.land/std",
-      version: LATEST,
-      path: "/version.ts",
-    });
-  });
-
-  it("https://deno.land/std@0.200.0/version.ts", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("https://deno.land/std@0.200.0/version.ts")),
-    )!;
-    assertExists(updated);
-    assertObjectMatch(updated, {
-      name: "deno.land/std",
-      version: LATEST,
-      path: "/version.ts",
-    });
-  });
-
-  it("https://deno.land/std@0.200.0/assert/mod.ts", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("https://deno.land/std@0.200.0/assert/mod.ts")),
-    );
-    assertExists(updated);
-    assertObjectMatch(updated, {
-      name: "deno.land/std",
-      version: LATEST,
-      path: "/assert/mod.ts",
-    });
-  });
-
-  it("npm:@alice/foo@1.0.0", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("npm:@alice/foo@1.0.0")),
-    );
-    assertExists(updated);
-    assertObjectMatch(updated, {
-      name: "@alice/foo",
-      version: LATEST,
-    });
-  });
-
-  it("npm:bob/foo@~1.0.0", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("npm:bob/foo@~1.0.0")),
-    );
-    // Do not update a version constraint.
-    assertEquals(updated, undefined);
-  });
-
-  it("npm:bob/bar@^1.0.0", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("npm:bob/bar@^1.0.0")),
-    );
-    // Do not update a version constraint.
-    assertEquals(updated, undefined);
-  });
-
-  it("npm:node-emoji@2", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("npm:node-emoji@2")),
-    );
-    // Do not update a version constraint.
-    assertEquals(updated, undefined);
-  });
-
-  it("jsr:@alice/foo@1.0.0", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("jsr:@scope/foo@1.0.0")),
-    );
-    assertExists(updated);
-    assertObjectMatch(updated, {
-      name: "@scope/foo",
-      version: LATEST,
-    });
-  });
-
-  it("jsr:@bob/foo@~1.0.0", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("jsr:@bob/foo@~1.0.0")),
-    );
-    // Do not update a version constraint.
-    assertEquals(updated, undefined);
-  });
-
-  it("jsr:@bob/bar@^1.0.0", async () => {
-    const updated = await resolveLatestVersion(
-      parse(new URL("jsr:@luca/flag@^1.0.0")),
-    );
-    // Do not update a version constraint.
-    assertEquals(updated, undefined);
-  });
-});
-
-describe("resolveLatestVersion - pre-release", () => {
-  let stub: LatestVersionStub;
-
-  beforeAll(() => {
-    stub = LatestVersionStub.create("123.456.789-alpha.1");
-  });
-
-  afterAll(() => {
-    stub.restore();
-  });
-
-  it("deno.land", async () =>
-    assertEquals(
-      await resolveLatestVersion(
-        parse(
-          new URL("https://deno.land/x/deno_graph@0.50.0/mod.ts"),
-        ),
-      ),
-      undefined,
-    ));
-
-  it("npm", async () =>
-    assertEquals(
-      await resolveLatestVersion(
-        parse(
-          new URL("npm:node-emoji@1.0.0"),
-        ),
-      ),
-      undefined,
-    ));
 });

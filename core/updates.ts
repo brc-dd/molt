@@ -1,15 +1,24 @@
 import { ensure, is } from "@core/unknownutil";
 import * as SemVer from "@std/semver";
-import { type Dependency, parse, stringify } from "./dependencies.ts";
+import { type DependencyComps, parse, stringify } from "./dependency.ts";
 import { filterValues, mapNotNullish } from "@std/collections";
 
+export interface DependencyUpdate {
+  /** The latest version available, including pre-releases. */
+  latest: string;
+  /** The latest version that satisfies the constraint. */
+  constrainted?: string;
+  /** The latest version that is not a pre-release. */
+  released?: string;
+}
+
 /**
- * Try resolving the latest version of the given dependency.
+ * Try resolving the latest version of the given dep.
  *
- * @returns The latest version of the given dependency, or `undefined` if the
- * latest version of dependency is unable to resolve.
+ * @returns The latest version of the given dep, or `undefined` if the
+ * latest version of dep is unable to resolve.
  *
- * @throws An error if the dependency is not found in the registry.
+ * @throws An error if the dep is not found in the registry.
  *
  * @example
  * await resolveLatestVersion(
@@ -17,27 +26,28 @@ import { filterValues, mapNotNullish } from "@std/collections";
  * );
  * // -> "0.224.0"
  */
-export async function getLatestVersion(
-  dependency: Dependency,
+export async function getUpdate(
+  dep: DependencyComps,
 ): Promise<string | undefined> {
-  const releases = await getReleases(dependency);
+  const releases = await getVersions(dep);
+  console.log(releases);
   return findLatest(releases);
 }
 
-async function getReleases(dependency: Dependency): Promise<string[]> {
-  switch (dependency.protocol) {
+async function getVersions(dep: DependencyComps): Promise<string[]> {
+  switch (dep.protocol) {
     case "npm:":
-      return getNpmReleases(dependency);
+      return getNpmReleases(dep);
     case "jsr:":
-      return getJsrReleases(dependency);
+      return getJsrReleases(dep);
   }
-  const latest = await getRemoteLatestVersion(dependency);
+  const latest = await getRemoteLatestVersion(dep);
   return latest ? [latest] : [];
 }
 
-async function getNpmReleases(dependency: Dependency): Promise<string[]> {
+async function getNpmReleases(dep: DependencyComps): Promise<string[]> {
   const res = await fetch(
-    `https://registry.npmjs.org/${dependency.name}`,
+    `https://registry.npmjs.org/${dep.name}`,
   );
   if (!res.ok) {
     throw new Deno.errors.Http(`${res.statusText}: ${res.url}`);
@@ -52,12 +62,12 @@ async function getNpmReleases(dependency: Dependency): Promise<string[]> {
   return Object.keys(meta.versions);
 }
 
-async function getJsrReleases(dependency: Dependency): Promise<string[]> {
+async function getJsrReleases(dep: DependencyComps): Promise<string[]> {
   const res = await fetch(
-    `https://jsr.io/${dependency.name}/meta.json`,
+    `https://jsr.io/${dep.name}/meta.json`,
   );
   if (!res.ok) {
-    throw new Deno.errors.Http(`${res.statusText}: ${dependency.name}`);
+    throw new Deno.errors.Http(`${res.statusText}: ${dep.name}`);
   }
   const isJsrPackageMeta = is.ObjectOf({
     versions: is.RecordOf(
@@ -70,9 +80,9 @@ async function getJsrReleases(dependency: Dependency): Promise<string[]> {
 }
 
 async function getRemoteLatestVersion(
-  dependency: Dependency,
+  dep: DependencyComps,
 ): Promise<string | undefined> {
-  const response = await fetch(stringify(dependency), { method: "HEAD" });
+  const response = await fetch(stringify(dep), { method: "HEAD" });
 
   // We don't need the body, just the headers.
   await response.arrayBuffer();
@@ -86,7 +96,7 @@ async function getRemoteLatestVersion(
 /** Find the latest non-pre-release version from the given list of versions. */
 function findLatest(versions: string[]): string | undefined {
   const latest = mapNotNullish(versions, SemVer.tryParse)
-    .filter((semver) => !semver.prerelease)
+    .filter((semver) => !semver.prerelease?.length)
     .sort(SemVer.compare).reverse().at(0);
   if (latest) {
     return SemVer.format(latest);
