@@ -1,6 +1,5 @@
 import { ensure, is } from "@core/unknownutil";
-import { type SemVer } from "@std/semver";
-import * as sv from "@std/semver";
+import * as SemVer from "@std/semver";
 import { type Dependency, parse, stringify } from "./dependency.ts";
 import { filterValues, mapNotNullish } from "@std/collections";
 
@@ -8,9 +7,9 @@ export interface DependencyUpdate {
   /** The latest version available, including pre-releases or whatever. */
   latest: string;
   /** The latest SemVer that satisfies the constraint. */
-  constrainted?: SemVer;
+  constrainted?: string;
   /** The latest SemVer that is not a pre-release */
-  released?: SemVer;
+  released?: string;
 }
 
 /**
@@ -44,9 +43,11 @@ async function getRemoteUpdate(
   dep: Dependency<"http" | "https">,
 ): Promise<DependencyUpdate | undefined> {
   const latest = await getRemoteLatestVersion(dep);
-  if (latest) {
-    const semver = sv.tryParse(latest);
-    const released = semver?.prerelease?.length ? semver : undefined;
+  if (latest && latest !== dep.version) {
+    const semver = SemVer.tryParse(latest);
+    const released = semver?.prerelease?.length
+      ? SemVer.format(semver)
+      : undefined;
     return { latest, released };
   }
 }
@@ -70,10 +71,10 @@ async function getPackageUpdate(
   dep: Dependency<"jsr" | "npm">,
 ): Promise<DependencyUpdate | undefined> {
   const versions = await getVersions(dep);
-  const semvers = mapNotNullish(versions, sv.tryParse);
+  const semvers = mapNotNullish(versions, SemVer.tryParse);
 
-  const range = dep.version ? sv.tryParseRange(dep.version) : undefined;
-  const constrainted = range ? sv.maxSatisfying(semvers, range) : undefined;
+  const range = dep.version ? SemVer.tryParseRange(dep.version) : undefined;
+  const constrainted = range ? SemVer.maxSatisfying(semvers, range) : undefined;
 }
 
 function getVersions(dep: Dependency<"jsr" | "npm">): Promise<string[]> {
@@ -117,11 +118,11 @@ async function getJsrReleases(dep: Dependency<"jsr">): Promise<string[]> {
 
 /** Find the latest non-pre-release version from the given list of versions. */
 function findLatest(versions: string[]): string | undefined {
-  const latest = mapNotNullish(versions, sv.tryParse)
+  const latest = mapNotNullish(versions, SemVer.tryParse)
     .filter((semver) => !semver.prerelease?.length)
-    .sort(sv.compare).reverse().at(0);
+    .sort(SemVer.compare).reverse().at(0);
   if (latest) {
-    return sv.format(latest);
+    return SemVer.format(latest);
   }
 }
 

@@ -3,7 +3,7 @@ import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import dedent from "dedent";
-import { collectFromEsModules, collectFromImportMap } from "./dependency.ts";
+import { collectFromEsModules, collectFromImportMap } from "./refs.ts";
 
 describe("collectFromEsModules", () => {
   beforeEach(() => {
@@ -28,9 +28,8 @@ describe("collectFromEsModules", () => {
         protocol: "jsr:",
         name: "@std/assert",
         version: "0.222.0",
-        entrypoint: "",
         source: {
-          type: "module",
+          type: "esm",
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
             start: { line: 0, character: 23 },
@@ -43,9 +42,8 @@ describe("collectFromEsModules", () => {
         protocol: "https:",
         name: "deno.land/std",
         version: "0.222.0",
-        entrypoint: "/bytes/copy.ts",
         source: {
-          type: "module",
+          type: "esm",
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
             start: { line: 1, character: 21 },
@@ -76,9 +74,8 @@ describe("collectFromEsModules", () => {
         protocol: "jsr:",
         name: "@std/assert",
         version: "0.222.0",
-        entrypoint: "",
         source: {
-          type: "module",
+          type: "esm",
           url: "file://" + join(Deno.cwd(), "a.ts"),
           span: {
             start: { line: 0, character: 23 },
@@ -91,9 +88,8 @@ describe("collectFromEsModules", () => {
         name: "deno.land/std",
         protocol: "https:",
         version: "0.222.0",
-        entrypoint: "/bytes/copy.ts",
         source: {
-          type: "module",
+          type: "esm",
           url: "file://" + join(Deno.cwd(), "b.ts"),
           span: {
             start: { line: 0, character: 21 },
@@ -145,7 +141,6 @@ describe("collectFromImportMap", () => {
         protocol: "jsr:",
         name: "@std/assert",
         version: "^0.222.0",
-        entrypoint: "",
         source: {
           type: "import_map",
           url: "file://" + join(Deno.cwd(), "a.json"),
@@ -157,7 +152,6 @@ describe("collectFromImportMap", () => {
         protocol: "jsr:",
         name: "@std/testing",
         version: "^0.222.0",
-        entrypoint: "/bdd",
         source: {
           type: "import_map",
           url: "file://" + join(Deno.cwd(), "a.json"),
