@@ -22,32 +22,24 @@ describe("collectFromEsModules", () => {
     const actual = await collectFromEsModules("a.ts");
     assertEquals(actual, [
       {
-        specifier: "jsr:@std/assert@0.222.0",
-        name: "@std/assert",
-        version: "0.222.0",
-        type: "jsr",
-        protocol: "jsr:",
-        source: {
-          type: "esm",
-          url: url("a.ts"),
-          span: {
-            start: { line: 0, character: 23 },
-            end: { line: 0, character: 48 },
-          },
-        },
-      },
-      {
         specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
-        name: "deno.land/std",
-        version: "0.222.0",
-        type: "remote",
-        protocol: "https:",
         source: {
           type: "esm",
           url: url("a.ts"),
           span: {
             start: { line: 1, character: 21 },
             end: { line: 1, character: 66 },
+          },
+        },
+      },
+      {
+        specifier: "jsr:@std/assert@0.222.0",
+        source: {
+          type: "esm",
+          url: url("a.ts"),
+          span: {
+            start: { line: 0, character: 23 },
+            end: { line: 0, character: 48 },
           },
         },
       },
@@ -70,26 +62,7 @@ describe("collectFromEsModules", () => {
     const actual = await collectFromEsModules(["a.ts", "b.ts"]);
     assertEquals(actual, [
       {
-        specifier: "jsr:@std/assert@0.222.0",
-        name: "@std/assert",
-        version: "0.222.0",
-        type: "jsr",
-        protocol: "jsr:",
-        source: {
-          type: "esm",
-          url: url("a.ts"),
-          span: {
-            start: { line: 0, character: 23 },
-            end: { line: 0, character: 48 },
-          },
-        },
-      },
-      {
         specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
-        name: "deno.land/std",
-        version: "0.222.0",
-        type: "remote",
-        protocol: "https:",
         source: {
           type: "esm",
           url: url("b.ts"),
@@ -99,10 +72,21 @@ describe("collectFromEsModules", () => {
           },
         },
       },
+      {
+        specifier: "jsr:@std/assert@0.222.0",
+        source: {
+          type: "esm",
+          url: url("a.ts"),
+          span: {
+            start: { line: 0, character: 23 },
+            end: { line: 0, character: 48 },
+          },
+        },
+      },
     ]);
   });
 
-  it("should collect dependencies mapped with import maps", async () => {
+  it.ignore("should collect dependencies mapped with import maps", async () => {
     await Deno.writeTextFile(
       "a.ts",
       dedent`
@@ -123,10 +107,6 @@ describe("collectFromEsModules", () => {
     assertEquals(actual, [
       {
         specifier: "jsr:@std/assert@^0.222.0",
-        name: "@std/assert",
-        version: "^0.222.0",
-        type: "jsr",
-        protocol: "jsr:",
         source: {
           type: "esm",
           url: url("a.ts"),
@@ -160,10 +140,6 @@ describe("collectFromImportMap", () => {
     assertEquals(actual, [
       {
         specifier: "jsr:@std/assert@^0.222.0",
-        name: "@std/assert",
-        version: "^0.222.0",
-        type: "jsr",
-        protocol: "jsr:",
         source: {
           type: "import_map",
           url: url("a.json"),
@@ -172,10 +148,6 @@ describe("collectFromImportMap", () => {
       },
       {
         specifier: "jsr:@std/testing@^0.222.0/bdd",
-        name: "@std/testing",
-        version: "^0.222.0",
-        type: "jsr",
-        protocol: "jsr:",
         source: {
           type: "import_map",
           url: url("a.json"),

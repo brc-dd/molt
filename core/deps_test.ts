@@ -9,9 +9,9 @@ describe("parse", () => {
       {
         name: "deno.land/std",
         version: "0.1.0",
+        entrypoint: "/assert/mod.ts",
         type: "remote",
         protocol: "https:",
-        specifier: "https://deno.land/std@0.1.0/assert/mod.ts",
       },
     );
   });
@@ -20,10 +20,9 @@ describe("parse", () => {
     assertEquals(
       parse("https://deno.land/std/assert/mod.ts"),
       {
-        name: "deno.land/std/assert",
+        name: "deno.land/std/assert/mod.ts",
         type: "remote",
         protocol: "https:",
-        specifier: "https://deno.land/std/assert/mod.ts",
       },
     );
   });
@@ -36,7 +35,6 @@ describe("parse", () => {
         version: "v0.1.0",
         type: "remote",
         protocol: "https:",
-        specifier: "https://deno.land/x/hono@v0.1.0",
       },
     );
   });
@@ -49,7 +47,6 @@ describe("parse", () => {
         version: "1.0.0",
         type: "npm",
         protocol: "npm:",
-        specifier: "npm:node-emoji@1.0.0",
       },
     );
   });
@@ -60,9 +57,9 @@ describe("parse", () => {
       {
         name: "cdn.jsdelivr.net/gh/hasundue/molt",
         version: "e4509a9",
+        entrypoint: "/mod.ts",
         type: "remote",
         protocol: "https:",
-        specifier: "https://cdn.jsdelivr.net/gh/hasundue/molt@e4509a9/mod.ts",
       },
     );
   });
@@ -73,9 +70,9 @@ describe("parse", () => {
       {
         name: "@luca/flag",
         version: "^1.0.0",
+        entrypoint: "/flag.ts",
         type: "jsr",
         protocol: "jsr:",
-        specifier: "jsr:@luca/flag@^1.0.0/flag.ts",
       },
     );
   });
@@ -87,7 +84,7 @@ describe("stringify", () => {
       stringify(
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
       ),
-      "https://deno.land/std@0.1.0",
+      "https://deno.land/std@0.1.0/assert/mod.ts",
     );
   });
 
@@ -97,7 +94,7 @@ describe("stringify", () => {
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
         { omit: ["protocol"] },
       ),
-      "deno.land/std@0.1.0",
+      "deno.land/std@0.1.0/assert/mod.ts",
     );
   });
 
@@ -107,7 +104,7 @@ describe("stringify", () => {
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
         { omit: ["version"] },
       ),
-      "https://deno.land/std",
+      "https://deno.land/std/assert/mod.ts",
     );
   });
 
@@ -115,7 +112,7 @@ describe("stringify", () => {
     assertEquals(
       stringify(
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
-        { omit: ["protocol", "version"] },
+        { omit: ["protocol", "version", "entrypoint"] },
       ),
       "deno.land/std",
     );

@@ -1,6 +1,5 @@
 import type { DependencyJson } from "@deno/graph/types";
 import { toUrl } from "@molt/lib/path";
-import { type Dependency, parse } from "./deps.ts";
 import { createGraphLocally } from "./graph.ts";
 import { readImportMapJson } from "./import_map.ts";
 
@@ -29,7 +28,7 @@ export type DependencySourceLocator<
 /** Representation of a reference to a dependency. */
 export interface DependencyRef<
   T extends SourceType = SourceType,
-> extends Dependency {
+> {
   /** The original specifier of the dependency appeared in the code. */
   specifier: string;
   /** Information about the source of the dependency. */
@@ -42,8 +41,8 @@ export interface CollectFromModuleOptions {
   recursive?: boolean;
 }
 
-const compareNames = (a: DependencyRef, b: DependencyRef) =>
-  a.name.localeCompare(b.name);
+const compare = (a: DependencyRef, b: DependencyRef) =>
+  a.specifier.localeCompare(b.specifier);
 
 /**
  * Collect dependencies from the given ES module(s), sorted by name.
@@ -64,7 +63,7 @@ export async function collectFromEsModules(
       if (dep) deps.push(dep);
     })
   );
-  return deps.sort(compareNames);
+  return deps.sort(compare);
 }
 
 function fromDependencyJson(
@@ -77,7 +76,6 @@ function fromDependencyJson(
   if (url && span) {
     return {
       specifier,
-      ...parse(url),
       source: { type: "esm", url: referrer, span },
     };
   }
@@ -94,7 +92,6 @@ export async function collectFromImportMap(
     [key, specifier],
   ): DependencyRef<"import_map"> => ({
     specifier,
-    ...parse(specifier),
     source: { type: "import_map", url, key },
-  })).sort(compareNames);
+  })).sort(compare);
 }

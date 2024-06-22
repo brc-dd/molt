@@ -1,6 +1,3 @@
-import { assertExists } from "@std/assert";
-import { dirname } from "@std/path";
-
 export type DependencyType = "jsr" | "npm" | "remote";
 export type DependencyProtocol<T extends DependencyType = DependencyType> =
   T extends "remote" ? "http:" | "https:" : `${T}:`;
@@ -20,12 +17,13 @@ export interface Dependency<
   /** The version string of the dependency.
    * @example "0.205.0" */
   version?: string;
+  /** The entrypoint specifier of the dependency.
+   * @example "/fs/mod.ts" */
+  entrypoint?: string;
   /** The type of the dependency. */
   type: T;
   /** The protocol of the dependency. */
   protocol: DependencyProtocol<T>;
-  /** The original specifier of the dependency. */
-  specifier: string;
 }
 
 /**
@@ -47,24 +45,29 @@ export function parse(specifier: string): Dependency {
     : protocol.slice(0, -1) as DependencyType;
   const body = url.hostname + url.pathname;
   // Try to find a path segment like "<name>@<version>/"
-  const matched = body.match(/^(?<name>.+)@(?<version>[^/]+)/);
+  const matched = body.match(
+    /^(?<name>.+)@(?<version>[^/]+)(?<entrypoint>\/.*)?$/,
+  );
   if (matched) {
-    assertExists(matched.groups);
-    const { name, version } = matched.groups;
-    return {
+    const { name, version, entrypoint } = matched.groups as {
+      name: string;
+      version: string;
+      entrypoint?: string;
+    };
+    const dep = {
       // jsr specifier may have a leading slash. e.g. jsr:/@std/testing^0.222.0/bdd
       name: name.startsWith("/") ? name.slice(1) : name,
       version,
       type,
       protocol,
-      specifier,
     };
+    return entrypoint ? { ...dep, entrypoint } : dep;
   }
-  return { name: dirname(body), type, protocol, specifier };
+  return { name: body, type, protocol };
 }
 
 export interface StringifyOptions {
-  omit?: ("protocol" | "version")[];
+  omit?: ("protocol" | "version" | "entrypoint")[];
 }
 
 /**
@@ -90,6 +93,9 @@ export function stringify(
   str += dep.name;
   if (!options.omit?.includes("version") && dep.version) {
     str += `@${dep.version}`;
+  }
+  if (!options.omit?.includes("entrypoint") && dep.entrypoint) {
+    str += dep.entrypoint;
   }
   return str;
 }

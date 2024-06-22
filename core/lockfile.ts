@@ -39,17 +39,16 @@ export async function readLockfile(
  * extractPackage("jsr:@std/testing@^0.222.0", lockfile);
  * ```
  */
-export function extract(
+export async function extract(
   dependency: Dependency,
   lockfile: Lockfile,
-): LockfileJson {
+): Promise<LockfileJson> {
   return dependency.type === "remote"
-    ? extractRemote(dependency.specifier, lockfile)
+    ? await extractRemote(dependency.specifier, lockfile)
     : extractPackage(dependency.name, lockfile);
 }
 
-
-export function extractPackage(
+function extractPackage(
   name: string,
   lockfile: Lockfile,
 ): LockfileJson {
@@ -65,7 +64,7 @@ export function extractPackage(
 /**
  * Extract the partial lock for the given remote specifier from a lockfile.
  */
-export async function extractRemote(
+async function extractRemote(
   specifier: string,
   lockfile: Lockfile,
 ): Promise<LockfileJson> {

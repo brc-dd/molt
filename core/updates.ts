@@ -53,7 +53,7 @@ async function getRemoteUpdate(
 async function getRemoteLatestVersion(
   dep: Dependency<"remote">,
 ): Promise<string | undefined> {
-  const url = stringify(dep, ["protocol", "name"]);
+  const url = stringify(dep, { omit: ["version"] });
   const res = await fetch(url, { method: "HEAD" });
 
   // We don't need the body, just the headers.
