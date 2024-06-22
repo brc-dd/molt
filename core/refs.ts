@@ -42,6 +42,9 @@ export interface CollectFromModuleOptions {
   recursive?: boolean;
 }
 
+const compareNames = (a: DependencyRef, b: DependencyRef) =>
+  a.name.localeCompare(b.name);
+
 /**
  * Collect dependencies from the given ES module(s), sorted by name.
  * @param paths The path to the ES module(s) to collect dependencies from.
@@ -63,9 +66,6 @@ export async function collectFromEsModules(
   );
   return deps.sort(compareNames);
 }
-
-const compareNames = (a: DependencyRef, b: DependencyRef) =>
-  a.name.localeCompare(b.name);
 
 function fromDependencyJson(
   json: DependencyJson,

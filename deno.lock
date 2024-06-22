@@ -2,7 +2,7 @@
   "version": "3",
   "packages": {
     "specifiers": {
-      "jsr:@chiezo/amber@^0.0.4": "jsr:@chiezo/amber@0.0.4",
+      "jsr:@chiezo/amber@^0.0.5": "jsr:@chiezo/amber@0.0.5",
       "jsr:@cliffy/ansi@1.0.0-rc.4": "jsr:@cliffy/ansi@1.0.0-rc.4",
       "jsr:@cliffy/command@1.0.0-rc.4": "jsr:@cliffy/command@1.0.0-rc.4",
       "jsr:@cliffy/flags@1.0.0-rc.4": "jsr:@cliffy/flags@1.0.0-rc.4",
@@ -60,9 +60,10 @@
       "npm:ts-toolbelt@9.6.0": "npm:ts-toolbelt@9.6.0"
     },
     "jsr": {
-      "@chiezo/amber@0.0.4": {
-        "integrity": "df43891314bbba07958bd237b6148129a0c0d9c1f28f2077879755e3b9adf793",
+      "@chiezo/amber@0.0.5": {
+        "integrity": "2e9f4fb543565cfb74eae0724bae87892925c3fceb4e494b7a81c0881f0b4486",
         "dependencies": [
+          "jsr:@molt/lib@^0.18.0",
           "jsr:@std/collections@^0.224.2",
           "jsr:@std/path@^0.225.1",
           "jsr:@std/testing@^0.224.0"
@@ -1655,7 +1656,7 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@chiezo/amber@^0.0.4",
+      "jsr:@chiezo/amber@^0.0.5",
       "jsr:@cliffy/ansi@1.0.0-rc.4",
       "jsr:@cliffy/command@1.0.0-rc.4",
       "jsr:@core/match@^0.2.5",

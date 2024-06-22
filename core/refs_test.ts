@@ -7,10 +7,8 @@ import { collectFromEsModules, collectFromImportMap } from "./refs.ts";
 
 describe("collectFromEsModules", () => {
   beforeEach(() => {
-    fs.stub(".");
     fs.mock();
   });
-
   afterEach(() => fs.dispose());
 
   it("should collect dependencies from a ES module", async () => {
@@ -114,10 +112,8 @@ describe("collectFromEsModules", () => {
 
 describe("collectFromImportMap", () => {
   beforeEach(() => {
-    fs.stub(".");
     fs.mock();
   });
-
   afterEach(() => fs.dispose());
 
   it("should collect dependencies from an import map", async () => {
