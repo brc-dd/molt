@@ -6,7 +6,7 @@ import {
   type Lockfile,
   type LockfileJson,
 } from "./deno_lockfile/js/mod.ts";
-import { Dependency } from "./deps.ts";
+import { Dependency, stringify } from "./deps.ts";
 import { DependencyUpdate } from "./updates.ts";
 
 export type { Lockfile, LockfileJson };
@@ -44,14 +44,15 @@ export async function extract(
   lockfile: Lockfile,
 ): Promise<LockfileJson> {
   return dependency.type === "remote"
-    ? await extractRemote(dependency.specifier, lockfile)
-    : extractPackage(dependency.name, lockfile);
+    ? await extractRemote(dependency as Dependency<"remote">, lockfile)
+    : extractPackage(dependency as Dependency<"jsr" | "npm">, lockfile);
 }
 
 function extractPackage(
-  name: string,
+  dep: Dependency<"jsr" | "npm">,
   lockfile: Lockfile,
 ): LockfileJson {
+  const name = stringify(dep, { omit: ["entrypoint"] });
   // We must copy the lockfile to avoid mutating the original.
   const copy = lockfile.copy();
   copy.setWorkspaceConfig({ dependencies: [name] });
@@ -65,11 +66,11 @@ function extractPackage(
  * Extract the partial lock for the given remote specifier from a lockfile.
  */
 async function extractRemote(
-  specifier: string,
+  dep: Dependency<"remote">,
   lockfile: Lockfile,
 ): Promise<LockfileJson> {
   const original = lockfile.toJson();
-  const graph = await createGraph(specifier);
+  const graph = await createGraph(stringify(dep));
   const dependencies = graph.modules.map((mod) => mod.specifier);
   return {
     version: original.version,

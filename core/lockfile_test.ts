@@ -1,11 +1,7 @@
 import { assertEquals, assertObjectMatch } from "@std/assert";
 import { beforeEach, describe, it } from "@std/testing/bdd";
-import {
-  extractPackage,
-  extractRemote,
-  type Lockfile,
-  readLockfile,
-} from "./lockfile.ts";
+import { extract, type Lockfile, readLockfile } from "./lockfile.ts";
+import { parse } from "./deps.ts";
 
 describe("readLockfile", () => {
   it("should read a lockfile", async () => {
@@ -28,7 +24,7 @@ describe("readLockfile", () => {
   });
 });
 
-describe("extractPackage", () => {
+describe("extract", () => {
   let lockfile: Lockfile;
 
   beforeEach(async () => {
@@ -37,8 +33,9 @@ describe("extractPackage", () => {
     );
   });
 
-  it("should extract the partial lock for a package from a lockfile", () => {
-    const part = extractPackage("jsr:@std/testing@^0.222.0", lockfile);
+  it("should extract the partial lock for a package from a lockfile", async () => {
+    const dep = parse("jsr:@std/testing@^0.222.0");
+    const part = await extract(dep, lockfile);
     assertEquals(part, {
       version: "3",
       packages: {
@@ -57,8 +54,9 @@ describe("extractPackage", () => {
     });
   });
 
-  it("should extract the partial lock along with the dependencies", () => {
-    const part = extractPackage("jsr:@std/assert@^0.222.0", lockfile);
+  it("should extract the partial lock along with the dependencies", async () => {
+    const dep = parse("jsr:@std/assert@^0.222.0");
+    const part = await extract(dep, lockfile);
     assertEquals(part, {
       version: "3",
       packages: {
@@ -84,17 +82,10 @@ describe("extractPackage", () => {
       workspace: { dependencies: ["jsr:@std/assert@^0.222.0"] },
     });
   });
-});
 
-describe("extractRemote", () => {
   it("should extract the remote dependencies", async () => {
-    const lockfile = await readLockfile(
-      new URL("../test/fixtures/deno.lock", import.meta.url),
-    );
-    const actual = await extractRemote(
-      "https://deno.land/x/deno_graph@0.50.0/mod.ts",
-      lockfile,
-    );
+    const dep = parse("https://deno.land/x/deno_graph@0.50.0/mod.ts");
+    const actual = await extract(dep, lockfile);
     assertEquals(actual, {
       version: "3",
       remote: lockfile.toJson().remote,

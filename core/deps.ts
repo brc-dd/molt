@@ -78,7 +78,8 @@ export interface StringifyOptions {
  *   type: "remote",
  *   name: "deno.land/std",
  *   version: "1.0.0",
- * }); // -> "https://deno.land/std@1.0.0"
+ *   entrypoint: "/fs/mod.ts",
+ * }); // -> "https://deno.land/std@1.0.0/fs/mod.ts"
  * ```
  */
 export function stringify(
