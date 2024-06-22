@@ -29,14 +29,9 @@ export interface DependencyUpdate {
 export function getUpdate(
   dep: Dependency,
 ): Promise<DependencyUpdate | undefined> {
-  switch (dep.protocol) {
-    case "http:":
-    case "https:":
-      return getRemoteUpdate(dep as Dependency<"remote">);
-    case "jsr:":
-    case "npm:":
-      return getPackageUpdate(dep as Dependency<"jsr" | "npm">);
-  }
+  return dep.type === "remote"
+    ? getRemoteUpdate(dep as Dependency<"remote">)
+    : getPackageUpdate(dep as Dependency<"jsr" | "npm">);
 }
 
 async function getRemoteUpdate(
@@ -58,7 +53,7 @@ async function getRemoteUpdate(
 async function getRemoteLatestVersion(
   dep: Dependency<"remote">,
 ): Promise<string | undefined> {
-  const url = stringify(dep, { version: false });
+  const url = stringify(dep, ["protocol", "name"]);
   const res = await fetch(url, { method: "HEAD" });
 
   // We don't need the body, just the headers.
@@ -100,10 +95,10 @@ async function getPackageUpdate(
 }
 
 function getVersions(dep: Dependency<"jsr" | "npm">): Promise<string[]> {
-  switch (dep.protocol) {
-    case "npm:":
+  switch (dep.type) {
+    case "npm":
       return getNpmVersions(dep as Dependency<"npm">);
-    case "jsr:":
+    case "jsr":
       return getJsrVersions(dep as Dependency<"jsr">);
   }
 }

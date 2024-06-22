@@ -1,9 +1,11 @@
 import * as fs from "@chiezo/amber/fs";
-import { assert, assertEquals } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import dedent from "dedent";
 import { collectFromEsModules, collectFromImportMap } from "./refs.ts";
+
+const url = (f: string) => "file://" + join(Deno.cwd(), f);
 
 describe("collectFromEsModules", () => {
   beforeEach(() => {
@@ -23,12 +25,13 @@ describe("collectFromEsModules", () => {
     assertEquals(actual, [
       {
         specifier: "jsr:@std/assert@0.222.0",
-        protocol: "jsr:",
         name: "@std/assert",
         version: "0.222.0",
+        type: "jsr",
+        protocol: "jsr:",
         source: {
           type: "esm",
-          url: "file://" + join(Deno.cwd(), "a.ts"),
+          url: url("a.ts"),
           span: {
             start: { line: 0, character: 23 },
             end: { line: 0, character: 48 },
@@ -37,12 +40,13 @@ describe("collectFromEsModules", () => {
       },
       {
         specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
-        protocol: "https:",
         name: "deno.land/std",
         version: "0.222.0",
+        type: "remote",
+        protocol: "https:",
         source: {
           type: "esm",
-          url: "file://" + join(Deno.cwd(), "a.ts"),
+          url: url("a.ts"),
           span: {
             start: { line: 1, character: 21 },
             end: { line: 1, character: 66 },
@@ -69,12 +73,13 @@ describe("collectFromEsModules", () => {
     assertEquals(actual, [
       {
         specifier: "jsr:@std/assert@0.222.0",
-        protocol: "jsr:",
         name: "@std/assert",
         version: "0.222.0",
+        type: "jsr",
+        protocol: "jsr:",
         source: {
           type: "esm",
-          url: "file://" + join(Deno.cwd(), "a.ts"),
+          url: url("a.ts"),
           span: {
             start: { line: 0, character: 23 },
             end: { line: 0, character: 48 },
@@ -84,11 +89,12 @@ describe("collectFromEsModules", () => {
       {
         specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
         name: "deno.land/std",
-        protocol: "https:",
         version: "0.222.0",
+        type: "remote",
+        protocol: "https:",
         source: {
           type: "esm",
-          url: "file://" + join(Deno.cwd(), "b.ts"),
+          url: url("b.ts"),
           span: {
             start: { line: 0, character: 21 },
             end: { line: 0, character: 66 },
@@ -98,15 +104,41 @@ describe("collectFromEsModules", () => {
     ]);
   });
 
-  it("should ignore dependencies which are supposed to be mapped with import maps", async () => {
+  it("should collect dependencies mapped with import maps", async () => {
     await Deno.writeTextFile(
       "a.ts",
       dedent`
         import { assert } from "@std/assert";
       `,
     );
-    const actual = await collectFromEsModules("a.ts");
-    assert(actual.length === 0);
+    await Deno.writeTextFile(
+      "a.json",
+      dedent`
+        {
+          "imports": {
+            "@std/assert": "jsr:@std/assert@^0.222.0"
+          }
+        }
+      `,
+    );
+    const actual = await collectFromEsModules("a.ts", { imports: "a.json" });
+    assertEquals(actual, [
+      {
+        specifier: "jsr:@std/assert@^0.222.0",
+        name: "@std/assert",
+        version: "^0.222.0",
+        type: "jsr",
+        protocol: "jsr:",
+        source: {
+          type: "esm",
+          url: url("a.ts"),
+          span: {
+            start: { line: 0, character: 23 },
+            end: { line: 0, character: 38 },
+          },
+        },
+      },
+    ]);
   });
 });
 
@@ -132,23 +164,25 @@ describe("collectFromImportMap", () => {
     assertEquals(actual, [
       {
         specifier: "jsr:@std/assert@^0.222.0",
-        protocol: "jsr:",
         name: "@std/assert",
         version: "^0.222.0",
+        type: "jsr",
+        protocol: "jsr:",
         source: {
           type: "import_map",
-          url: "file://" + join(Deno.cwd(), "a.json"),
+          url: url("a.json"),
           key: "@std/assert",
         },
       },
       {
         specifier: "jsr:@std/testing@^0.222.0/bdd",
-        protocol: "jsr:",
         name: "@std/testing",
         version: "^0.222.0",
+        type: "jsr",
+        protocol: "jsr:",
         source: {
           type: "import_map",
-          url: "file://" + join(Deno.cwd(), "a.json"),
+          url: url("a.json"),
           key: "@std/testing/bdd",
         },
       },

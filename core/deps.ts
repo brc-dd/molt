@@ -14,15 +14,16 @@ const isDependencyProtocol = (
 export interface Dependency<
   T extends DependencyType = DependencyType,
 > {
-  /** The URL protocol of the dependency specifier.
-   * @example "jsr:", "npm:", "https:" */
-  protocol: DependencyProtocol<T>;
-  /** The name of the dependency, or a string between the protocol and version.
+  /** The name of the dependency
    * @example "deno.land/std" */
   name: string;
   /** The version string of the dependency.
    * @example "0.205.0" */
   version?: string;
+  /** The type of the dependency. */
+  type: T;
+  /** The protocol of the dependency. */
+  protocol: DependencyProtocol<T>;
 }
 
 /**
@@ -31,46 +32,53 @@ export interface Dependency<
  * const { name, version, path } = Dependency.parse(
  *   new URL("https://deno.land/std@0.200.0/fs/mod.ts")
  * );
- * // -> { protocol: "https:", name: "deno.land/std", version: "0.200.0" }
+ * // -> { type: "remote", name: "deno.land/std", version: "0.200.0" }
  */
 export function parse(specifier: string | URL): Dependency {
-  specifier = new URL(specifier);
-  const protocol = specifier.protocol;
+  const url = new URL(specifier);
+  const protocol = url.protocol;
   if (!isDependencyProtocol(protocol)) {
     throw new Error(`Invalid protocol: ${protocol}`);
   }
-  const body = specifier.hostname + specifier.pathname;
+  const type = protocol.startsWith("http")
+    ? "remote"
+    : protocol.slice(0, -1) as DependencyType;
+  const body = url.hostname + url.pathname;
   // Try to find a path segment like "<name>@<version>/"
   const matched = body.match(/^(?<name>.+)@(?<version>[^/]+)/);
   if (matched) {
     assertExists(matched.groups);
     const { name, version } = matched.groups;
     return {
-      protocol,
       // jsr specifier may have a leading slash. e.g. jsr:/@std/testing^0.222.0/bdd
       name: name.startsWith("/") ? name.slice(1) : name,
       version,
+      type,
+      protocol,
     };
   }
-  return { protocol, name: dirname(body) };
+  return { name: dirname(body), type, protocol };
 }
 
 /**
  * Convert the given dependency to a URL string.
  * @example
  * stringify({
- *   protocol: "https:",
+ *   type: "remote",
  *   name: "deno.land/std",
  *   version: "1.0.0",
  * }); // -> "https://deno.land/std@1.0.0"
  */
 export function stringify(
   dep: Dependency,
-  include: { protocol?: boolean; version?: boolean } = {},
+  include: (keyof Dependency)[] = ["protocol", "name", "version"],
 ): string {
-  const toHeader = (protocol: string) =>
-    protocol.startsWith("http") ? protocol + "//" : protocol;
-  const header = (include.protocol ?? true) ? toHeader(dep.protocol) : "";
-  const version = (include.version ?? true) ? "@" + dep.version : "";
-  return `${header}${dep.name}${version}`;
+  let str = "";
+  if (include.includes("protocol")) {
+    str += dep.protocol;
+    if (dep.type === "remote") str += "//";
+  }
+  if (include.includes("name")) str += dep.name;
+  if (include.includes("version") && dep.version) str += `@${dep.version}`;
+  return str;
 }

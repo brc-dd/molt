@@ -7,9 +7,10 @@ describe("parse", () => {
     assertEquals(
       parse("https://deno.land/std@0.1.0/assert/mod.ts"),
       {
-        protocol: "https:",
         name: "deno.land/std",
         version: "0.1.0",
+        type: "remote",
+        protocol: "https:",
       },
     );
   });
@@ -18,42 +19,42 @@ describe("parse", () => {
     assertEquals(
       parse("https://deno.land/std/assert/mod.ts"),
       {
-        protocol: "https:",
+        type: "remote",
         name: "deno.land/std/assert",
+        protocol: "https:",
       },
     ));
 
-  it("deno.land/x/ (with a leading 'v')", () =>
+  it("deno.land/x (with a leading 'v')", () =>
     assertEquals(
       parse("https://deno.land/x/hono@v0.1.0"),
       {
-        protocol: "https:",
         name: "deno.land/x/hono",
         version: "v0.1.0",
+        type: "remote",
+        protocol: "https:",
       },
     ));
 
   it("npm:", () =>
     assertEquals(
-      parse(
-        new URL("npm:node-emoji@1.0.0"),
-      ),
+      parse("npm:node-emoji@1.0.0"),
       {
-        protocol: "npm:",
+        type: "npm",
         name: "node-emoji",
         version: "1.0.0",
+        protocol: "npm:",
       },
     ));
 
   it("cdn.jsdelivr.net/gh", () =>
     assertEquals(
-      parse(
-        new URL("https://cdn.jsdelivr.net/gh/hasundue/molt@e4509a9/mod.ts"),
-      ),
+      parse("https://cdn.jsdelivr.net/gh/hasundue/molt@e4509a9/mod.ts"),
       {
-        protocol: "https:",
         name: "cdn.jsdelivr.net/gh/hasundue/molt",
         version: "e4509a9",
+        type: "remote",
+        protocol: "https:",
       },
     ));
 
@@ -61,9 +62,10 @@ describe("parse", () => {
     assertEquals(
       parse(new URL("jsr:@luca/flag@^1.0.0/flag.ts")),
       {
-        protocol: "jsr:",
         name: "@luca/flag",
         version: "^1.0.0",
+        type: "jsr",
+        protocol: "jsr:",
       },
     ));
 });
@@ -72,9 +74,10 @@ describe("stringify", () => {
   it("full", () =>
     assertEquals(
       stringify({
-        protocol: "https:",
         name: "deno.land/std",
         version: "0.1.0",
+        type: "remote",
+        protocol: "https:",
       }),
       "https://deno.land/std@0.1.0",
     ));
@@ -82,30 +85,33 @@ describe("stringify", () => {
   it("without protocol", () =>
     assertEquals(
       stringify({
-        protocol: "https:",
         name: "deno.land/std",
         version: "0.1.0",
-      }, { protocol: false }),
+        type: "remote",
+        protocol: "https:",
+      }, ["name", "version"]),
       "deno.land/std@0.1.0",
     ));
 
   it("without version", () =>
     assertEquals(
       stringify({
-        protocol: "https:",
         name: "deno.land/std",
         version: "0.1.0",
-      }, { version: false }),
+        type: "remote",
+        protocol: "https:",
+      }, ["protocol", "name"]),
       "https://deno.land/std",
     ));
 
   it("name only", () =>
     assertEquals(
       stringify({
-        protocol: "https:",
         name: "deno.land/std",
         version: "0.1.0",
-      }, { protocol: false, version: false }),
+        type: "remote",
+        protocol: "https:",
+      }, ["name"]),
       "deno.land/std",
     ));
 });
