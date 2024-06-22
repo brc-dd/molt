@@ -24,6 +24,8 @@ export interface Dependency<
   type: T;
   /** The protocol of the dependency. */
   protocol: DependencyProtocol<T>;
+  /** The original specifier of the dependency. */
+  specifier: string;
 }
 
 /**
@@ -34,7 +36,7 @@ export interface Dependency<
  * );
  * // -> { type: "remote", name: "deno.land/std", version: "0.200.0" }
  */
-export function parse(specifier: string | URL): Dependency {
+export function parse(specifier: string): Dependency {
   const url = new URL(specifier);
   const protocol = url.protocol;
   if (!isDependencyProtocol(protocol)) {
@@ -55,30 +57,39 @@ export function parse(specifier: string | URL): Dependency {
       version,
       type,
       protocol,
+      specifier,
     };
   }
-  return { name: dirname(body), type, protocol };
+  return { name: dirname(body), type, protocol, specifier };
+}
+
+export interface StringifyOptions {
+  omit?: ("protocol" | "version")[];
 }
 
 /**
  * Convert the given dependency to a URL string.
  * @example
+ * ```ts
  * stringify({
  *   type: "remote",
  *   name: "deno.land/std",
  *   version: "1.0.0",
  * }); // -> "https://deno.land/std@1.0.0"
+ * ```
  */
 export function stringify(
   dep: Dependency,
-  include: (keyof Dependency)[] = ["protocol", "name", "version"],
+  options: StringifyOptions = {},
 ): string {
   let str = "";
-  if (include.includes("protocol")) {
+  if (!options.omit?.includes("protocol")) {
     str += dep.protocol;
     if (dep.type === "remote") str += "//";
   }
-  if (include.includes("name")) str += dep.name;
-  if (include.includes("version") && dep.version) str += `@${dep.version}`;
+  str += dep.name;
+  if (!options.omit?.includes("version") && dep.version) {
+    str += `@${dep.version}`;
+  }
   return str;
 }

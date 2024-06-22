@@ -1,3 +1,4 @@
+import { createGraph } from "@deno/graph";
 import { toPath } from "@molt/lib/path";
 import { filterValues, pick } from "@std/collections";
 import {
@@ -5,7 +6,8 @@ import {
   type Lockfile,
   type LockfileJson,
 } from "./deno_lockfile/js/mod.ts";
-import { createGraph } from "@deno/graph";
+import { Dependency } from "./deps.ts";
+import { DependencyUpdate } from "./updates.ts";
 
 export type { Lockfile, LockfileJson };
 
@@ -29,14 +31,24 @@ export async function readLockfile(
  *
  * @param name - The import requirement of the JSR or NPM package.
  * @param lockfile - The `Lockfile` object to extract the partial lock for the dependency from.
- * @returns The `Lockfile` object representing the partial lock.
+ * @returns The `LockfileJson` object representing the partial lock.
  *
  * @example
- * ```typescript
+ * ```ts
  * const lockfile = await readLockFile("deno.lock");
  * extractPackage("jsr:@std/testing@^0.222.0", lockfile);
  * ```
  */
+export function extract(
+  dependency: Dependency,
+  lockfile: Lockfile,
+): LockfileJson {
+  return dependency.type === "remote"
+    ? extractRemote(dependency.specifier, lockfile)
+    : extractPackage(dependency.name, lockfile);
+}
+
+
 export function extractPackage(
   name: string,
   lockfile: Lockfile,
@@ -70,9 +82,40 @@ export async function extractRemote(
 }
 
 /**
- * Create a new lockfile with the dependencies updated.
+ * Create a new partial lock for the given dependency updated.
  */
-export async function collectLockfileUpdates(
-  lockfile: LockfileJson,
+export function getUpdate(
+  lockfile: Lockfile,
+  dependency: Dependency,
+  update: DependencyUpdate,
 ): Promise<LockfileJson> {
+  return dependency.type === "remote"
+    ? getRemoteUpdate(
+      lockfile,
+      dependency as Dependency<"remote">,
+      update,
+    )
+    : getPackageUpdate(
+      lockfile,
+      dependency as Dependency<"jsr" | "npm">,
+      update,
+    );
+}
+
+async function getPackageUpdate(
+  lockfile: Lockfile,
+  dependency: Dependency<"jsr" | "npm">,
+  update: DependencyUpdate,
+): Promise<LockfileJson> {
+  const { name } = dependency;
+  const original = extractPackage(name, lockfile);
+}
+
+async function getRemoteUpdate(
+  lockfile: Lockfile,
+  dependency: Dependency<"remote">,
+  update: DependencyUpdate,
+): Promise<LockfileJson> {
+  const { specifier } = dependency;
+  const original = await extractRemote(specifier, lockfile);
 }

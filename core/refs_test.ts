@@ -8,9 +8,7 @@ import { collectFromEsModules, collectFromImportMap } from "./refs.ts";
 const url = (f: string) => "file://" + join(Deno.cwd(), f);
 
 describe("collectFromEsModules", () => {
-  beforeEach(() => {
-    fs.mock();
-  });
+  beforeEach(() => fs.mock());
   afterEach(() => fs.dispose());
 
   it("should collect dependencies from a ES module", async () => {
@@ -143,9 +141,7 @@ describe("collectFromEsModules", () => {
 });
 
 describe("collectFromImportMap", () => {
-  beforeEach(() => {
-    fs.mock();
-  });
+  beforeEach(() => fs.mock());
   afterEach(() => fs.dispose());
 
   it("should collect dependencies from an import map", async () => {

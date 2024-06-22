@@ -1,7 +1,7 @@
 import { ensure, is } from "@core/unknownutil";
+import { filterValues, mapNotNullish, maxWith } from "@std/collections";
 import * as SemVer from "@std/semver";
 import { type Dependency, parse, stringify } from "./deps.ts";
-import { filterValues, mapNotNullish, maxWith } from "@std/collections";
 
 export interface DependencyUpdate {
   /** The latest version available, including pre-releases or whatever. */
