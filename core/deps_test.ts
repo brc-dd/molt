@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { parse, stringify } from "./deps.ts";
 
@@ -7,34 +7,26 @@ describe("parse", () => {
     assertEquals(
       parse("https://deno.land/std@0.1.0/assert/mod.ts"),
       {
+        kind: "https",
         name: "deno.land/std",
-        version: "0.1.0",
-        entrypoint: "/assert/mod.ts",
-        type: "remote",
-        protocol: "https:",
+        constraint: "0.1.0",
+        path: "/assert/mod.ts",
       },
     );
   });
 
   it("deno.land/std (no semver)", () => {
-    assertEquals(
-      parse("https://deno.land/std/assert/mod.ts"),
-      {
-        name: "deno.land/std/assert/mod.ts",
-        type: "remote",
-        protocol: "https:",
-      },
-    );
+    assertThrows(() => parse("https://deno.land/std/assert/mod.ts"));
   });
 
   it("deno.land/x (with a leading 'v')", () => {
     assertEquals(
       parse("https://deno.land/x/hono@v0.1.0"),
       {
+        kind: "https",
         name: "deno.land/x/hono",
-        version: "v0.1.0",
-        type: "remote",
-        protocol: "https:",
+        constraint: "v0.1.0",
+        path: "",
       },
     );
   });
@@ -43,10 +35,10 @@ describe("parse", () => {
     assertEquals(
       parse("npm:node-emoji@1.0.0"),
       {
+        kind: "npm",
         name: "node-emoji",
-        version: "1.0.0",
-        type: "npm",
-        protocol: "npm:",
+        constraint: "1.0.0",
+        path: "",
       },
     );
   });
@@ -55,24 +47,22 @@ describe("parse", () => {
     assertEquals(
       parse("https://cdn.jsdelivr.net/gh/hasundue/molt@e4509a9/mod.ts"),
       {
+        kind: "https",
         name: "cdn.jsdelivr.net/gh/hasundue/molt",
-        version: "e4509a9",
-        entrypoint: "/mod.ts",
-        type: "remote",
-        protocol: "https:",
+        constraint: "e4509a9",
+        path: "/mod.ts",
       },
     );
   });
 
   it("jsr:", () => {
     assertEquals(
-      parse("jsr:@luca/flag@^1.0.0/flag.ts"),
+      parse("jsr:@std/fs@^0.222.0/exists"),
       {
-        name: "@luca/flag",
-        version: "^1.0.0",
-        entrypoint: "/flag.ts",
-        type: "jsr",
-        protocol: "jsr:",
+        kind: "jsr",
+        name: "@std/fs",
+        constraint: "^0.222.0",
+        path: "/exists",
       },
     );
   });
@@ -102,7 +92,7 @@ describe("stringify", () => {
     assertEquals(
       stringify(
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
-        { omit: ["version"] },
+        { omit: ["constraint"] },
       ),
       "https://deno.land/std/assert/mod.ts",
     );
@@ -112,7 +102,7 @@ describe("stringify", () => {
     assertEquals(
       stringify(
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
-        { omit: ["protocol", "version", "entrypoint"] },
+        { omit: ["protocol", "constraint", "path"] },
       ),
       "deno.land/std",
     );

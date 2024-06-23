@@ -1,29 +1,25 @@
-export type DependencyType = "jsr" | "npm" | "remote";
-export type DependencyProtocol<T extends DependencyType = DependencyType> =
-  T extends "remote" ? "http:" | "https:" : `${T}:`;
+import { assert } from "@std/assert";
 
-const isDependencyProtocol = (
-  protocol: string,
-): protocol is DependencyProtocol =>
-  ["jsr:", "npm:", "http:", "https:"].includes(protocol);
+export type DependencyKind = "jsr" | "npm" | "http" | "https";
+
+function isDependencyKind(kind: string): kind is DependencyKind {
+  return ["jsr", "npm", "http", "https"].includes(kind);
+}
 
 /** Parsed components of a dependency specifier. */
 export interface Dependency<
-  T extends DependencyType = DependencyType,
+  K extends DependencyKind = DependencyKind,
 > {
+  kind: K;
   /** The name of the dependency
-   * @example "deno.land/std" */
+   * @example "@std/fs", "hono", "deno.land/std" */
   name: string;
-  /** The version string of the dependency.
-   * @example "0.205.0" */
-  version?: string;
+  /** The version constraint string of the dependency.
+   * @example "0.222.1", "^0.222.0" */
+  constraint: string;
   /** The entrypoint specifier of the dependency.
-   * @example "/fs/mod.ts" */
-  entrypoint?: string;
-  /** The type of the dependency. */
-  type: T;
-  /** The protocol of the dependency. */
-  protocol: DependencyProtocol<T>;
+   * @example "", "/fs/mod.ts" */
+  path: string;
 }
 
 /**
@@ -36,38 +32,46 @@ export interface Dependency<
  */
 export function parse(specifier: string): Dependency {
   const url = new URL(specifier);
-  const protocol = url.protocol;
-  if (!isDependencyProtocol(protocol)) {
-    throw new Error(`Invalid protocol: ${protocol}`);
-  }
-  const type = protocol.startsWith("http")
-    ? "remote"
-    : protocol.slice(0, -1) as DependencyType;
+
+  const kind = url.protocol.slice(0, -1);
+  assert(isDependencyKind(kind), `Invalid protocol: ${kind}:`);
+
   const body = url.hostname + url.pathname;
   // Try to find a path segment like "<name>@<version>/"
   const matched = body.match(
-    /^(?<name>.+)@(?<version>[^/]+)(?<entrypoint>\/.*)?$/,
+    /^(?<name>.+)@(?<constraint>[^/]+)(?<path>\/.*)?$/,
   );
-  if (matched) {
-    const { name, version, entrypoint } = matched.groups as {
-      name: string;
-      version: string;
-      entrypoint?: string;
-    };
-    const dep = {
-      // jsr specifier may have a leading slash. e.g. jsr:/@std/testing^0.222.0/bdd
-      name: name.startsWith("/") ? name.slice(1) : name,
-      version,
-      type,
-      protocol,
-    };
-    return entrypoint ? { ...dep, entrypoint } : dep;
+  if (!matched) {
+    throw new Error(`Could not parse dependency: ${specifier}`);
   }
-  return { name: body, type, protocol };
+  const { name, constraint, path } = matched.groups as {
+    name: string;
+    constraint: string;
+    path?: string;
+  };
+  return {
+    kind,
+    // jsr specifier may have a leading slash. e.g. jsr:/@std/testing^0.222.0/bdd
+    name: name.startsWith("/") ? name.slice(1) : name,
+    constraint,
+    path: path ? path : "",
+  };
+}
+
+/**
+ * Try to parse a dependency from a string representation.
+ * @returns The parsed dependency, or `undefined` if the specifier is not parsable.
+ */
+export function tryParse(specifier: string): Dependency | undefined {
+  try {
+    return parse(specifier);
+  } catch {
+    return undefined;
+  }
 }
 
 export interface StringifyOptions {
-  omit?: ("protocol" | "version" | "entrypoint")[];
+  omit?: ("protocol" | "constraint" | "path")[];
 }
 
 /**
@@ -88,15 +92,15 @@ export function stringify(
 ): string {
   let str = "";
   if (!options.omit?.includes("protocol")) {
-    str += dep.protocol;
-    if (dep.type === "remote") str += "//";
+    str += dep.kind + ":";
+    if (dep.kind.startsWith("http")) str += "//";
   }
   str += dep.name;
-  if (!options.omit?.includes("version") && dep.version) {
-    str += `@${dep.version}`;
+  if (!options.omit?.includes("constraint") && dep.constraint) {
+    str += `@${dep.constraint}`;
   }
-  if (!options.omit?.includes("entrypoint") && dep.entrypoint) {
-    str += dep.entrypoint;
+  if (!options.omit?.includes("path") && dep.path) {
+    str += dep.path;
   }
   return str;
 }
