@@ -18,7 +18,8 @@ import {
 } from "./deps.ts";
 import { DependencyUpdate, getUpdate } from "./updates.ts";
 
-const VERSION = (await import("./deno.json", { with: { type: "json" } })).default.version;
+const VERSION =
+  (await import("./deno.json", { with: { type: "json" } })).default.version;
 
 export type { Lockfile, LockfileJson };
 
@@ -136,7 +137,7 @@ export function getUpdatePart(
     )
     : getPackageUpdate(
       lockfile,
-      dependency as Dependency<"jsr" | "npm">,
+      { ...dependency, path: "" } as Dependency<"jsr" | "npm">,
       update,
     );
 }
@@ -147,25 +148,66 @@ async function getPackageUpdate(
   update: DependencyUpdate,
   options: UpdateOptions = {},
 ): Promise<UpdatePart> {
-  const before = extractPackage(dependency, lockfile);
-
-  const specifiers: [string, string][] = [];
-
-  const deps = await getDependencies({
+  assert(dependency.path === "");
+  lockfile = parseFromJson(lockfile.filename, {
+    "version": "3",
+    remote: {},
+    workspace: {
+      dependencies: [
+        stringify({ ...dependency, path: "" }),
+      ],
+    },
+  });
+  const target = {
     ...dependency,
     constraint: update.constrainted ?? update.latest,
-  });
-  console.log(deps);
-
-  const specifiers = await mapEntriesAsync(
-    before.packages?.specifiers ?? {},
-    (entry) => updateSpecifierEntry(entry, dependency, update, options),
-  );
-
-  const updated = {
-    specifiers,
   };
-  return { deleted: {}, updated };
+  lockfile.insertPackageSpecifier(
+    stringify(dependency),
+    stringify(target),
+  );
+  await insertPackage(lockfile, target);
+
+  return { deleted: {}, updated: lockfile.toJson() };
+}
+
+async function insertPackage(
+  lockfile: Lockfile,
+  root: Dependency<"jsr" | "npm">,
+): Promise<void> {
+  const name = stringify(root, { omit: ["protocol", "path"] });
+  if (root.kind === "jsr") {
+    lockfile.insertPackage(
+      name,
+      await getJsrPackageIntegrity(root as Dependency<"jsr">),
+    );
+  } else {
+    lockfile.insertNpmPackage(
+      name,
+      await getNpmPackageInfo(root as Dependency<"npm">),
+    );
+  }
+  const deps = await getDependencies(root);
+  lockfile.addPackageDeps(
+    name,
+    deps.map((dep) => stringify({ ...dep, path: "" })),
+  );
+  for (let dep of deps) {
+    dep = { ...dep, path: "" };
+    const update = await getUpdate(dep);
+    const target = update
+      ? {
+        ...dep,
+        constraint: update.constrainted ?? update.latest,
+        path: "",
+      }
+      : dep;
+    lockfile.insertPackageSpecifier(
+      stringify(dep),
+      stringify(target),
+    );
+    await insertPackage(lockfile, target);
+  }
 }
 
 /**
@@ -179,13 +221,27 @@ async function getPackageUpdate(
  */
 function getDependencies(
   dependency: Dependency<"jsr" | "npm">,
-): Promise<string[]> {
+): Promise<Dependency<"jsr" | "npm">[]> {
   switch (dependency.kind) {
     case "jsr":
       return getJsrDependencies(dependency as Dependency<"jsr">);
     case "npm":
       return getNpmDependencies(dependency as Dependency<"npm">);
   }
+}
+
+async function getJsrPackageIntegrity(
+  dependency: Dependency<"jsr">,
+): Promise<string> {
+  const { name, constraint: version } = dependency;
+  const res = await fetch(`https://jsr.io/${name}/${version}_meta.json`);
+  // Calculate the sha256 hash of the response json.
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    await res.arrayBuffer(),
+  );
+  const arr = Array.from(new Uint8Array(buf));
+  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 type Package<T extends "jsr" | "npm"> = T extends "jsr"
@@ -213,7 +269,7 @@ function parsePackage<T extends "jsr" | "npm">(
 
 async function getJsrDependencies(
   dependency: Dependency<"jsr">,
-): Promise<Dependency[]> {
+): Promise<Dependency<"jsr" | "npm">[]> {
   const { constraint: version } = dependency;
   assert(SemVer.parseRange(version).length === 1, "Expect an identifier");
   const { scope, name } = parsePackage(dependency);
@@ -225,35 +281,10 @@ async function getJsrDependencies(
       },
     },
   );
-  return ensure(await res.json(), is.ArrayOf(isDependency));
-}
-
-async function mapEntriesAsync(
-  record: Record<string, string>,
-  transformer: (entry: [string, string]) => Promise<[string, string]>,
-): Promise<Record<string, string>> {
-  return Object.fromEntries(
-    await Promise.all(
-      Object.entries(record).map((entry) => transformer(entry)),
-    ),
-  );
-}
-
-async function updateSpecifierEntry(
-  entry: [string, string],
-  dependency: Dependency<"jsr" | "npm">,
-  update: DependencyUpdate,
-  options: UpdateOptions,
-): Promise<[string, string]> {
-  const req = parse(entry[0]);
-  const id = parse(entry[1]);
-  assertEquals(req.name, id.name);
-  if (req.name === dependency.name) {
-    // The entry is the targeting package.
-  } else {
-    // The entry is a dependency of the targeting package.
-  }
-  return entry;
+  return ensure(
+    await res.json(),
+    is.ArrayOf(isDependency),
+  ) as Dependency<"jsr" | "npm">[];
 }
 
 async function getRemoteUpdate(

@@ -3,9 +3,8 @@ import { is } from "@core/unknownutil";
 
 export type DependencyKind = "jsr" | "npm" | "http" | "https";
 
-function isDependencyKind(kind: string): kind is DependencyKind {
-  return ["jsr", "npm", "http", "https"].includes(kind);
-}
+const isKind = (kind: string): kind is DependencyKind =>
+  ["jsr", "npm", "http", "https"].includes(kind);
 
 /** Parsed components of a dependency specifier. */
 export interface Dependency<
@@ -48,7 +47,7 @@ export function parse(specifier: string): Dependency {
   const url = new URL(specifier);
 
   const kind = url.protocol.slice(0, -1);
-  assert(isDependencyKind(kind), `Invalid protocol: ${kind}:`);
+  assert(isKind(kind), `Invalid protocol: ${kind}:`);
 
   const body = url.hostname + url.pathname;
   // Try to find a path segment like "<name>@<version>/"

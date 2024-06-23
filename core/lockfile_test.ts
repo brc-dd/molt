@@ -1,7 +1,12 @@
 import * as fs from "@chiezo/amber/fs";
 import { assertEquals, assertObjectMatch } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
-import { extract, getUpdatePart, type Lockfile, readLockfile } from "./lockfile.ts";
+import {
+  extract,
+  getUpdatePart,
+  type Lockfile,
+  readLockfile,
+} from "./lockfile.ts";
 import { parse } from "./deps.ts";
 import { DependencyUpdate } from "./updates.ts";
 
@@ -138,7 +143,7 @@ describe("extract", () => {
   });
 });
 
-describe("getUpdatePart - package", () => {
+describe.only("getUpdatePart - package", () => {
   let lockfile: Lockfile;
   const dependency = parse("jsr:@std/assert@^0.222.0");
   const update: DependencyUpdate = {
@@ -155,24 +160,26 @@ describe("getUpdatePart - package", () => {
   afterEach(() => fs.dispose());
 
   it("should create a new partial lock for a package updated", async () => {
-    const { deleted, updated } = await getUpdatePart(lockfile, dependency, update);
-    assertEquals(deleted, {});
-    assertEquals(updated, {
+    const part = await getUpdatePart(lockfile, dependency, update);
+    assertEquals(part.deleted, {});
+    assertEquals(part.updated, {
       version: "3",
       packages: {
         specifiers: {
           "jsr:@std/assert@^0.222.0": "jsr:@std/assert@0.222.1",
-          "jsr:@std/fmt@^0.222.0": "jsr:@std/fmt@0.222.1",
+          "jsr:@std/fmt@^0.222.1": "jsr:@std/fmt@0.222.1",
         },
         jsr: {
           "@std/assert@0.222.1": {
-            "integrity": "",
+            "integrity":
+              "691637161ee584a9919d1f9950ddd1272feb8e0a19e83aa5b7563cedaf73d74c",
             "dependencies": [
               "jsr:@std/fmt@^0.222.1",
             ],
           },
           "@std/fmt@0.222.1": {
-            "integrity": "",
+            "integrity":
+              "ec3382f9b0261c1ab1a5c804aa355d816515fa984cdd827ed32edfb187c0a722",
           },
         },
       },
