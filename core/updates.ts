@@ -29,13 +29,13 @@ export interface DependencyUpdate {
 export function getUpdate(
   dep: Dependency,
 ): Promise<DependencyUpdate | undefined> {
-  return dep.type === "remote"
-    ? getRemoteUpdate(dep as Dependency<"remote">)
+  return dep.kind.startsWith("http")
+    ? getRemoteUpdate(dep as Dependency<"http" | "https">)
     : getPackageUpdate(dep as Dependency<"jsr" | "npm">);
 }
 
 async function getRemoteUpdate(
-  dep: Dependency<"remote">,
+  dep: Dependency<"http" | "https">,
 ): Promise<DependencyUpdate | undefined> {
   const latest = await getRemoteLatestVersion(dep);
   if (latest) {
@@ -51,9 +51,9 @@ async function getRemoteUpdate(
 }
 
 async function getRemoteLatestVersion(
-  dep: Dependency<"remote">,
+  dep: Dependency<"http" | "https">,
 ): Promise<string | undefined> {
-  const url = stringify(dep, { omit: ["version"] });
+  const url = stringify(dep, { omit: ["constraint"] });
   const res = await fetch(url, { method: "HEAD" });
 
   // We don't need the body, just the headers.
@@ -63,7 +63,7 @@ async function getRemoteLatestVersion(
   if (!res.redirected) {
     return;
   }
-  return parse(res.url).version;
+  return parse(res.url).constraint;
 }
 
 async function getPackageUpdate(
@@ -78,14 +78,14 @@ async function getPackageUpdate(
   const releases = semvers.filter((it) => !it.prerelease?.length);
   const released = maxWith(releases, SemVer.compare);
 
-  if (!dep.version) {
+  if (!dep.constraint) {
     return {
       latest: SemVer.format(latest),
       released: released && SemVer.format(released),
     };
   }
 
-  const range = SemVer.tryParseRange(dep.version);
+  const range = SemVer.tryParseRange(dep.constraint);
   const constrainted = range && SemVer.maxSatisfying(semvers, range);
   return {
     latest: SemVer.format(latest),
@@ -95,7 +95,7 @@ async function getPackageUpdate(
 }
 
 function getVersions(dep: Dependency<"jsr" | "npm">): Promise<string[]> {
-  switch (dep.type) {
+  switch (dep.kind) {
     case "npm":
       return getNpmVersions(dep as Dependency<"npm">);
     case "jsr":

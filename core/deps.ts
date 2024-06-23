@@ -1,4 +1,5 @@
 import { assert } from "@std/assert";
+import { is } from "@core/unknownutil";
 
 export type DependencyKind = "jsr" | "npm" | "http" | "https";
 
@@ -20,6 +21,19 @@ export interface Dependency<
   /** The entrypoint specifier of the dependency.
    * @example "", "/fs/mod.ts" */
   path: string;
+}
+
+export const isDependency = is.ObjectOf({
+  kind: is.LiteralOneOf(["jsr", "npm", "http", "https"] as const),
+  name: is.String,
+  constraint: is.String,
+  path: is.String,
+});
+
+export function isRemote(
+  dep: Dependency,
+): dep is Dependency<"http" | "https"> {
+  return dep.kind === "http" || dep.kind === "https";
 }
 
 /**

@@ -1,9 +1,33 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
-import { parse, stringify } from "./deps.ts";
+import { parse, stringify, tryParse } from "./deps.ts";
 
 describe("parse", () => {
-  it("deno.land/std", () => {
+  it("should parse a jsr specifier", () => {
+    assertEquals(
+      parse("jsr:@std/fs@^0.222.0/exists"),
+      {
+        kind: "jsr",
+        name: "@std/fs",
+        constraint: "^0.222.0",
+        path: "/exists",
+      },
+    );
+  });
+
+  it("should parse a npm specifier", () => {
+    assertEquals(
+      parse("npm:hono@v4.0.0"),
+      {
+        kind: "npm",
+        name: "hono",
+        constraint: "v4.0.0",
+        path: "",
+      },
+    );
+  });
+
+  it("should parse a url specifier", () => {
     assertEquals(
       parse("https://deno.land/std@0.1.0/assert/mod.ts"),
       {
@@ -15,35 +39,11 @@ describe("parse", () => {
     );
   });
 
-  it("deno.land/std (no semver)", () => {
+  it("should throws for a url specifier without version constraint", () => {
     assertThrows(() => parse("https://deno.land/std/assert/mod.ts"));
   });
 
-  it("deno.land/x (with a leading 'v')", () => {
-    assertEquals(
-      parse("https://deno.land/x/hono@v0.1.0"),
-      {
-        kind: "https",
-        name: "deno.land/x/hono",
-        constraint: "v0.1.0",
-        path: "",
-      },
-    );
-  });
-
-  it("npm:", () => {
-    assertEquals(
-      parse("npm:node-emoji@1.0.0"),
-      {
-        kind: "npm",
-        name: "node-emoji",
-        constraint: "1.0.0",
-        path: "",
-      },
-    );
-  });
-
-  it("cdn.jsdelivr.net/gh", () => {
+  it("should parse a non-semver version constraint", () => {
     assertEquals(
       parse("https://cdn.jsdelivr.net/gh/hasundue/molt@e4509a9/mod.ts"),
       {
@@ -54,17 +54,15 @@ describe("parse", () => {
       },
     );
   });
+});
 
-  it("jsr:", () => {
-    assertEquals(
-      parse("jsr:@std/fs@^0.222.0/exists"),
-      {
-        kind: "jsr",
-        name: "@std/fs",
-        constraint: "^0.222.0",
-        path: "/exists",
-      },
-    );
+describe("tryParse", () => {
+  it("should return `undefined` for an invalid specifier", () => {
+    assertEquals(tryParse("invalid"), undefined);
+  });
+
+  it("should return `undefined` for a specifier without constraint", () => {
+    assertEquals(tryParse("https://deno.land/std/fs/mod.ts"), undefined);
   });
 });
 

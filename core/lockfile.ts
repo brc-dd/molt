@@ -1,16 +1,24 @@
+import { ensure, is } from "@core/unknownutil";
 import { createGraph } from "@deno/graph";
 import { toPath } from "@molt/lib/path";
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { filterValues, pick } from "@std/collections";
+import * as SemVer from "@std/semver";
 import {
   instantiate,
   type Lockfile,
   type LockfileJson,
 } from "./deno_lockfile/js/mod.ts";
-import { version as VERSION } from "./deno.json" with { type: "json" };
-import { Dependency, parse, stringify } from "./deps.ts";
+import {
+  Dependency,
+  isDependency,
+  isRemote,
+  parse,
+  stringify,
+} from "./deps.ts";
 import { DependencyUpdate, getUpdate } from "./updates.ts";
-import { ensure, is } from "@core/unknownutil";
+
+const VERSION = (await import("./deno.json", { with: { type: "json" } })).default.version;
 
 export type { Lockfile, LockfileJson };
 
@@ -46,8 +54,8 @@ export async function extract(
   dependency: Dependency,
   lockfile: Lockfile,
 ): Promise<LockfileJson> {
-  return dependency.kind === "remote"
-    ? await extractRemote(dependency as Dependency<"remote">, lockfile)
+  return isRemote(dependency)
+    ? await extractRemote(dependency, lockfile)
     : extractPackage(dependency as Dependency<"jsr" | "npm">, lockfile);
 }
 
@@ -55,7 +63,7 @@ function extractPackage(
   dependency: Dependency<"jsr" | "npm">,
   lockfile: Lockfile,
 ): LockfileJson {
-  const name = stringify(dependency, { omit: ["entrypoint"] });
+  const name = stringify(dependency, { omit: ["path"] });
   // We must copy the lockfile to avoid mutating the original.
   const copy = lockfile.copy();
   copy.setWorkspaceConfig({ dependencies: [name] });
@@ -69,7 +77,7 @@ function extractPackage(
  * Extract the partial lock for the given remote specifier from a lockfile.
  */
 async function extractRemote(
-  dep: Dependency<"remote">,
+  dep: Dependency<"http" | "https">,
   lockfile: Lockfile,
 ): Promise<LockfileJson> {
   const original = lockfile.toJson();
@@ -120,10 +128,10 @@ export function getUpdatePart(
   dependency: Dependency,
   update: DependencyUpdate,
 ): Promise<UpdatePart> {
-  return dependency.kind === "remote"
+  return isRemote(dependency)
     ? getRemoteUpdate(
       lockfile,
-      dependency as Dependency<"remote">,
+      dependency,
       update,
     )
     : getPackageUpdate(
@@ -141,7 +149,12 @@ async function getPackageUpdate(
 ): Promise<UpdatePart> {
   const before = extractPackage(dependency, lockfile);
 
-  const deps = await getDependencies(dependency);
+  const specifiers: [string, string][] = [];
+
+  const deps = await getDependencies({
+    ...dependency,
+    constraint: update.constrainted ?? update.latest,
+  });
   console.log(deps);
 
   const specifiers = await mapEntriesAsync(
@@ -169,9 +182,9 @@ function getDependencies(
 ): Promise<string[]> {
   switch (dependency.kind) {
     case "jsr":
-      return getJsrDependencies(dependency);
+      return getJsrDependencies(dependency as Dependency<"jsr">);
     case "npm":
-      return getNpmDependencies(dependency);
+      return getNpmDependencies(dependency as Dependency<"npm">);
   }
 }
 
@@ -200,22 +213,19 @@ function parsePackage<T extends "jsr" | "npm">(
 
 async function getJsrDependencies(
   dependency: Dependency<"jsr">,
-): Promise<string[]> {
-  const { constraint } = dependency;
+): Promise<Dependency[]> {
+  const { constraint: version } = dependency;
+  assert(SemVer.parseRange(version).length === 1, "Expect an identifier");
   const { scope, name } = parsePackage(dependency);
   const res = await fetch(
-    `https://api.jsr.io/scopes/${scope}/packages/${name}/versions/${constraint}/dependencies`,
+    `https://api.jsr.io/scopes/${scope}/packages/${name}/versions/${version}/dependencies`,
     {
       headers: {
         "User-Agent": `molt/${VERSION}; https://jsr.io/@molt`,
       },
     },
   );
-  const json = ensure(
-    await res.json(),
-    is.ArrayOf(is.ObjectOf({ name: is.String })),
-  );
-  return json.dependencies;
+  return ensure(await res.json(), is.ArrayOf(isDependency));
 }
 
 async function mapEntriesAsync(
@@ -229,15 +239,12 @@ async function mapEntriesAsync(
   );
 }
 
-/** @example ["jsr:@std/testing@^0.222.0", "jsr:@std/testing@0.222.1"] */
-type SpecifierEntry = [req: string, id: string];
-
 async function updateSpecifierEntry(
-  entry: SpecifierEntry,
+  entry: [string, string],
   dependency: Dependency<"jsr" | "npm">,
   update: DependencyUpdate,
   options: UpdateOptions,
-): Promise<SpecifierEntry> {
+): Promise<[string, string]> {
   const req = parse(entry[0]);
   const id = parse(entry[1]);
   assertEquals(req.name, id.name);
@@ -251,7 +258,7 @@ async function updateSpecifierEntry(
 
 async function getRemoteUpdate(
   lockfile: Lockfile,
-  dependency: Dependency<"remote">,
+  dependency: Dependency<"http" | "https">,
   update: DependencyUpdate,
 ): Promise<UpdatePart> {
   const before = await extractRemote(dependency, lockfile);
