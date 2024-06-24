@@ -9,7 +9,7 @@ import {
   type LockfileJson,
 } from "./deno_lockfile/js/mod.ts";
 import { Dependency, isDependency, isRemote, stringify } from "./deps.ts";
-import { DependencyUpdate, getUpdate } from "./updates.ts";
+import { getUpdate } from "./updates.ts";
 
 const VERSION =
   (await import("./deno.json", { with: { type: "json" } })).default.version;
@@ -62,7 +62,8 @@ function extractPackage(
   const copy = lockfile.copy();
   copy.setWorkspaceConfig({ dependencies: [name] });
   return {
-    ...pick(copy.toJson(), ["version", "packages", "workspace"]),
+    version: "3",
+    ...pick(copy.toJson(), ["packages", "workspace"]),
     remote: {},
   };
 }
@@ -78,7 +79,7 @@ async function extractRemote(
   const graph = await createGraph(stringify(dep));
   const dependencies = graph.modules.map((mod) => mod.specifier);
   return {
-    version: original.version,
+    version: "3",
     remote: filterValues(
       pick(original.remote, dependencies),
       (hash) => hash !== undefined,
@@ -93,16 +94,6 @@ export type UpdateStrategy = "auto" | "widen" | "increase" | "lock-only";
 
 export interface UpdateOptions {
   strategy?: UpdateStrategy;
-}
-
-/**
- * An update to a dependency in a lockfile.
- */
-interface UpdatePart {
-  /** The deleted part of partial lockfile for the dependency. */
-  deleted: LockfileDeletion;
-  /** The updated part of partial lockfile for the dependency. */
-  updated: LockfileJson;
 }
 
 interface LockfileDeletion {
@@ -122,28 +113,25 @@ export interface LockfileUpdateParams {
 /**
  * Create a new partial lock for the given dependency updated.
  */
-export function getUpdatePart(
-  lockfile: Lockfile,
+export function createLock(
   dependency: Dependency,
-  params: LockfileUpdateParams,
-): Promise<UpdatePart> {
+  target: string,
+): Promise<LockfileJson> {
   return isRemote(dependency)
-    ? getRemoteUpdate(lockfile, dependency, params)
-    : getPackageUpdate(
-      lockfile,
+    ? createRemoteLock(dependency, target)
+    : createPackageLock(
       { ...dependency, path: "" } as Dependency<"jsr" | "npm">,
-      params,
+      target,
     );
 }
 
-async function getPackageUpdate(
-  lockfile: Lockfile,
+async function createPackageLock(
   dependency: Dependency<"jsr" | "npm">,
-  params: LockfileUpdateParams,
-): Promise<UpdatePart> {
+  target: string,
+): Promise<LockfileJson> {
   assert(dependency.path === "");
-  lockfile = parseFromJson(lockfile.filename, {
-    "version": "3",
+  const lockfile = parseFromJson("", {
+    version: "3",
     remote: {},
     workspace: {
       dependencies: [
@@ -151,18 +139,18 @@ async function getPackageUpdate(
       ],
     },
   });
-  await insertPackage(lockfile, dependency, params);
-  return { deleted: {}, updated: lockfile.toJson() };
+  await insertPackage(lockfile, dependency, target);
+  return lockfile.toJson();
 }
 
 async function insertPackage(
   lockfile: Lockfile,
   request: Dependency<"jsr" | "npm">,
-  params: LockfileUpdateParams,
+  target: string,
 ) {
   const identifier = {
     ...request,
-    constraint: params.increase ?? params.lock,
+    constraint: target,
   };
   lockfile.insertPackageSpecifier(
     stringify(request),
@@ -188,9 +176,7 @@ async function insertPackage(
   for (const dep of deps) {
     dep.path = "";
     const update = await getUpdate(dep);
-    await insertPackage(lockfile, dep, {
-      lock: update?.constrainted ?? dep.constraint,
-    });
+    await insertPackage(lockfile, dep, update?.constrainted ?? dep.constraint);
   }
 }
 
@@ -261,11 +247,8 @@ function parsePackage<T extends "jsr" | "npm">(
   return { name: dependency } as unknown as Package<T>;
 }
 
-async function getRemoteUpdate(
-  lockfile: Lockfile,
+async function createRemoteLock(
   dependency: Dependency<"http" | "https">,
-  update: DependencyUpdate,
-): Promise<UpdatePart> {
-  const before = await extractRemote(dependency, lockfile);
-  return { deleted: {}, updated: before };
+  params: LockfileUpdateParams,
+): Promise<LockfileJson> {
 }

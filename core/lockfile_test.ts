@@ -2,13 +2,12 @@ import * as fs from "@chiezo/amber/fs";
 import { assertEquals, assertObjectMatch } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
+  createLock,
   extract,
-  getUpdatePart,
   type Lockfile,
   readLockfile,
 } from "./lockfile.ts";
 import { parse } from "./deps.ts";
-import { DependencyUpdate } from "./updates.ts";
 
 const LOCKFILE: string = `{
   "version": "3",
@@ -143,20 +142,16 @@ describe("extract", () => {
   });
 });
 
-describe.only("getUpdatePart - package", () => {
-  let lockfile: Lockfile;
-  const dependency = parse("jsr:@std/assert@^0.222.0");
-
-  beforeEach(async () => {
-    fs.mock();
-    await Deno.writeTextFile("deno.lock", LOCKFILE);
-    lockfile = await readLockfile("deno.lock");
-  });
+describe.only("createLock - package", () => {
+  beforeEach(() => fs.mock());
   afterEach(() => fs.dispose());
 
   it("should create a new partial lock for a package updated", async () => {
-    const part = await getUpdatePart(lockfile, dependency, { lock: "0.222.1" });
-    assertEquals(part.updated, {
+    const update = await createLock(
+      parse("jsr:@std/assert@^0.222.0"),
+      "0.222.1",
+    );
+    assertEquals(update, {
       version: "3",
       packages: {
         specifiers: {
@@ -180,6 +175,34 @@ describe.only("getUpdatePart - package", () => {
       remote: {},
       workspace: { dependencies: ["jsr:@std/assert@^0.222.0"] },
     });
-    assertEquals(part.deleted, {});
+  });
+
+  it("should create a new partial lock for a package updated", async () => {
+    const part = await createLock(
+      parse("jsr:@std/assert@^0.226.0"),
+      "0.226.0",
+    );
+    assertEquals(part, {
+      version: "3",
+      packages: {
+        specifiers: {
+          "jsr:@std/assert@^0.222.0": "jsr:@std/assert@0.226.0",
+          "jsr:@std/internal@^1.0.0": "jsr:@std/internal@1.0.0",
+        },
+        jsr: {
+          "@std/assert@0.226.0": {
+            integrity:
+              "0dfb5f7c7723c18cec118e080fec76ce15b4c31154b15ad2bd74822603ef75b3",
+            dependencies: ["jsr:@std/internal@^1.0.0"],
+          },
+          "@std/internal@1.0.0": {
+            integrity:
+              "ac6a6dfebf838582c4b4f61a6907374e27e05bedb6ce276e0f1608fe84e7cd9a",
+          },
+        },
+      },
+      remote: {},
+      workspace: { dependencies: ["jsr:@std/assert@^0.222.0"] },
+    });
   });
 });
