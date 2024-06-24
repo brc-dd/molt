@@ -1,15 +1,10 @@
 import * as fs from "@chiezo/amber/fs";
 import { assertEquals, assertObjectMatch } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
-import {
-  createLock,
-  extract,
-  type Lockfile,
-  readLockfile,
-} from "./lockfile.ts";
+import { createLock, extract, readLockfile } from "./lockfile.ts";
 import { parse } from "./deps.ts";
 
-const LOCKFILE: string = `{
+const LOCKFILE = `{
   "version": "3",
   "packages": {
     "specifiers": {
@@ -33,14 +28,8 @@ const LOCKFILE: string = `{
     }
   },
   "remote": {
-    "https://deno.land/x/deno_graph@0.50.0/deno_graph_wasm.generated.js": "e1d58f79f4e33c7cc1062af565600f422a2fec1b5eaee42691f2a7992d9d5e6b",
-    "https://deno.land/x/deno_graph@0.50.0/loader.ts": "a2e757383908f4a51659fe1b1203386887ebb17756bac930a64856d613d8d57d",
-    "https://deno.land/x/deno_graph@0.50.0/media_type.ts": "a89a1b38d07c160e896de9ceb99285ba8391940140558304171066b5c3ef7609",
-    "https://deno.land/x/deno_graph@0.50.0/mod.ts": "47b5e8560f3e66468194742239fc76cf587d611dd43c1913eeebb9b1d94fc39f",
-    "https://deno.land/x/deno_graph@0.50.0/types.d.ts": "8f4101e79df43b526cd8d6528fb0ce1d2e719576bcb69640f92bf4f5af977fd7",
-    "https://deno.land/x/dir@1.5.1/data_local_dir/mod.ts": "91eb1c4bfadfbeda30171007bac6d85aadacd43224a5ed721bbe56bc64e9eb66",
-    "https://deno.land/x/wasmbuild@0.14.1/cache.ts": "89eea5f3ce6035a1164b3e655c95f21300498920575ade23161421f5b01967f4",
-    "https://deno.land/x/wasmbuild@0.14.1/loader.ts": "d98d195a715f823151cbc8baa3f32127337628379a02d9eb2a3c5902dbccfc02"
+    "https://deno.land/std@0.220.0/assert/assert.ts": "bec068b2fccdd434c138a555b19a2c2393b71dfaada02b7d568a01541e67cdc5",
+    "https://deno.land/std@0.220.0/assert/assertion_error.ts": "9f689a101ee586c4ce92f52fa7ddd362e86434ffdf1f848e45987dc7689976b8"
   },
   "workspace": {
     "dependencies": [
@@ -74,18 +63,14 @@ describe("readLockfile", () => {
 });
 
 describe("extract", () => {
-  let lockfile: Lockfile;
+  const json = JSON.parse(LOCKFILE);
 
-  beforeEach(async () => {
-    fs.mock();
-    await Deno.writeTextFile("deno.lock", LOCKFILE);
-    lockfile = await readLockfile("deno.lock");
-  });
+  beforeEach(() => fs.mock());
   afterEach(() => fs.dispose());
 
   it("should extract the partial lock for a package from a lockfile", async () => {
     const dep = parse("jsr:@std/testing@^0.222.0");
-    const part = await extract(dep, lockfile);
+    const part = await extract(dep, json);
     assertEquals(part, {
       version: "3",
       packages: {
@@ -106,7 +91,7 @@ describe("extract", () => {
 
   it("should extract the partial lock along with the dependencies", async () => {
     const dep = parse("jsr:@std/assert@^0.222.0");
-    const part = await extract(dep, lockfile);
+    const part = await extract(dep, json);
     assertEquals(part, {
       version: "3",
       packages: {
@@ -134,11 +119,11 @@ describe("extract", () => {
   });
 
   it("should extract the remote dependencies", async () => {
-    const dep = parse("https://deno.land/x/deno_graph@0.50.0/mod.ts");
-    const actual = await extract(dep, lockfile);
+    const dep = parse("https://deno.land/std@0.220.0/assert/assert.ts");
+    const actual = await extract(dep, json);
     assertEquals(actual, {
       version: "3",
-      remote: lockfile.toJson().remote,
+      remote: json.remote,
     });
   });
 });
@@ -209,28 +194,16 @@ describe("createLock", () => {
 
   it("should create a partial lock for a remote dependency", async () => {
     const lock = await createLock(
-      parse("https://deno.land/x/deno_graph@0.50.0/mod.ts"),
-      "0.50.0",
+      parse("https://deno.land/std@0.224.0/assert/assert.ts"),
+      "0.224.0",
     );
     assertEquals(lock, {
       version: "3",
       remote: {
-        "https://deno.land/x/deno_graph@0.50.0/deno_graph_wasm.generated.js":
-          "e1d58f79f4e33c7cc1062af565600f422a2fec1b5eaee42691f2a7992d9d5e6b",
-        "https://deno.land/x/deno_graph@0.50.0/loader.ts":
-          "a2e757383908f4a51659fe1b1203386887ebb17756bac930a64856d613d8d57d",
-        "https://deno.land/x/deno_graph@0.50.0/media_type.ts":
-          "a89a1b38d07c160e896de9ceb99285ba8391940140558304171066b5c3ef7609",
-        "https://deno.land/x/deno_graph@0.50.0/mod.ts":
-          "47b5e8560f3e66468194742239fc76cf587d611dd43c1913eeebb9b1d94fc39f",
-        "https://deno.land/x/deno_graph@0.50.0/types.d.ts":
-          "8f4101e79df43b526cd8d6528fb0ce1d2e719576bcb69640f92bf4f5af977fd7",
-        "https://deno.land/x/dir@1.5.1/data_local_dir/mod.ts":
-          "91eb1c4bfadfbeda30171007bac6d85aadacd43224a5ed721bbe56bc64e9eb66",
-        "https://deno.land/x/wasmbuild@0.14.1/cache.ts":
-          "89eea5f3ce6035a1164b3e655c95f21300498920575ade23161421f5b01967f4",
-        "https://deno.land/x/wasmbuild@0.14.1/loader.ts":
-          "d98d195a715f823151cbc8baa3f32127337628379a02d9eb2a3c5902dbccfc02",
+        "https://deno.land/std@0.224.0/assert/assert.ts":
+          "09d30564c09de846855b7b071e62b5974b001bb72a4b797958fe0660e7849834",
+        "https://deno.land/std@0.224.0/assert/assertion_error.ts":
+          "ba8752bd27ebc51f723702fac2f54d3e94447598f54264a6653d6413738a8917",
       },
     });
   });

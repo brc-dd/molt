@@ -2,6 +2,7 @@ import { ensure, is } from "@core/unknownutil";
 import { filterValues, mapNotNullish, maxWith } from "@std/collections";
 import * as SemVer from "@std/semver";
 import { type Dependency, parse, stringify } from "./deps.ts";
+import { assertOk } from "./internal.ts";
 
 export interface DependencyUpdate {
   /** The latest version available, including pre-releases or whatever. */
@@ -131,10 +132,4 @@ async function getJsrVersions(dep: Dependency<"jsr">): Promise<string[]> {
   });
   const meta = ensure(await res.json(), isJsrPackageMeta);
   return Object.keys(filterValues(meta.versions, (it) => !it.yanked));
-}
-
-function assertOk(res: Response): void {
-  if (!res.ok) {
-    throw new Deno.errors.Http(`${res.statusText}: ${res.url}`);
-  }
 }

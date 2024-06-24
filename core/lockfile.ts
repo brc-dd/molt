@@ -1,14 +1,16 @@
+import { match, placeholder as _ } from "@core/match";
 import { ensure, is } from "@core/unknownutil";
 import { createGraph } from "@deno/graph";
 import { toPath } from "@molt/lib/path";
-import { assert } from "@std/assert";
 import { filterValues, pick } from "@std/collections";
 import {
   instantiate,
   type Lockfile,
   type LockfileJson,
+  type NpmPackageInfo,
 } from "./deno_lockfile/js/mod.ts";
 import { Dependency, isDependency, isRemote, stringify } from "./deps.ts";
+import { assertOk, checksum } from "./internal.ts";
 import { getUpdate } from "./updates.ts";
 
 const VERSION =
@@ -35,7 +37,7 @@ export async function readLockfile(
  * Extract the partial lock for the given JSR or NPM package from a lockfile.
  *
  * @param name - The import requirement of the JSR or NPM package.
- * @param lockfile - The `Lockfile` object to extract the partial lock for the dependency from.
+ * @param lock - The `Lockfile` object to extract the partial lock for the dependency from.
  * @returns The `LockfileJson` object representing the partial lock.
  *
  * @example
@@ -46,44 +48,39 @@ export async function readLockfile(
  */
 export async function extract(
   dependency: Dependency,
-  lockfile: Lockfile,
+  lock: LockfileJson,
 ): Promise<LockfileJson> {
   return isRemote(dependency)
-    ? await extractRemote(dependency, lockfile)
-    : extractPackage(dependency as Dependency<"jsr" | "npm">, lockfile);
+    ? await extractRemote(dependency, lock)
+    : extractPackage(dependency as Dependency<"jsr" | "npm">, lock);
 }
 
-function extractPackage(
-  dependency: Dependency<"jsr" | "npm">,
-  lockfile: Lockfile,
-): LockfileJson {
-  const name = stringify(dependency, "kind", "name", "constraint");
-  // We must copy the lockfile to avoid mutating the original.
-  const copy = lockfile.copy();
-  copy.setWorkspaceConfig({ dependencies: [name] });
-  return {
-    version: "3",
-    ...pick(copy.toJson(), ["packages", "workspace"]),
-    remote: {},
-  };
-}
-
-/**
- * Extract the partial lock for the given remote specifier from a lockfile.
- */
 async function extractRemote(
   dep: Dependency<"http" | "https">,
-  lockfile: Lockfile,
+  lock: LockfileJson,
 ): Promise<LockfileJson> {
-  const original = lockfile.toJson();
   const graph = await createGraph(stringify(dep));
   const deps = graph.modules.map((mod) => mod.specifier);
   return {
     version: "3",
     remote: filterValues(
-      pick(original.remote, deps),
+      pick(lock.remote, deps),
       (hash) => hash !== undefined,
     ),
+  };
+}
+
+function extractPackage(
+  dependency: Dependency<"jsr" | "npm">,
+  lock: LockfileJson,
+): LockfileJson {
+  const name = stringify(dependency, "kind", "name", "constraint");
+  const lockfile = parseFromJson("", lock);
+  lockfile.setWorkspaceConfig({ dependencies: [name] });
+  return {
+    version: "3",
+    ...pick(lockfile.toJson(), ["packages", "workspace"]),
+    remote: {},
   };
 }
 
@@ -110,17 +107,31 @@ export function createLock(
 ): Promise<LockfileJson> {
   return isRemote(dependency)
     ? createRemoteLock(dependency)
-    : createPackageLock(
-      { ...dependency, path: "" } as Dependency<"jsr" | "npm">,
-      target,
-    );
+    : createPackageLock(dependency as Dependency<"jsr" | "npm">, target);
+}
+
+async function createRemoteLock(
+  dep: Dependency<"http" | "https">,
+): Promise<LockfileJson> {
+  const lockfile = parseFromJson("", {
+    version: "3",
+    remote: {},
+  });
+  const graph = await createGraph(stringify(dep));
+  const deps = graph.modules.map((mod) => mod.specifier);
+  for (const dep of deps) {
+    const res = await fetch(dep);
+    assertOk(res);
+    lockfile.insertRemote(dep, await checksum(await res.arrayBuffer()));
+  }
+  return lockfile.toJson();
 }
 
 async function createPackageLock(
   dependency: Dependency<"jsr" | "npm">,
   target: string,
 ): Promise<LockfileJson> {
-  assert(dependency.path === "");
+  dependency = { ...dependency, path: "" };
   const lockfile = parseFromJson("", {
     version: "3",
     remote: {},
@@ -148,18 +159,10 @@ async function insertPackage(
     stringify(identifier),
   );
   const specifier = stringify(identifier, "name", "constraint");
-  if (request.kind === "jsr") {
-    lockfile.insertPackage(
-      specifier,
-      await getJsrPackageIntegrity(identifier as Dependency<"jsr">),
-    );
-  } else {
-    lockfile.insertNpmPackage(
-      specifier,
-      await getNpmPackageInfo(identifier as Dependency<"npm">),
-    );
-  }
-  const deps = await getDependencies(identifier);
+  const deps =
+    await (request.kind === "jsr"
+      ? insertJsrPackage(lockfile, specifier, identifier as Dependency<"jsr">)
+      : insertNpmPackage(lockfile, specifier, identifier as Dependency<"npm">));
   lockfile.addPackageDeps(
     specifier,
     deps.map((dep) => stringify(dep, "kind", "name", "constraint")),
@@ -171,15 +174,31 @@ async function insertPackage(
   }
 }
 
-function getDependencies(
-  dependency: Dependency<"jsr" | "npm">,
+async function insertJsrPackage(
+  lockfile: Lockfile,
+  specifier: string,
+  identifier: Dependency<"jsr">,
 ): Promise<Dependency<"jsr" | "npm">[]> {
-  switch (dependency.kind) {
-    case "jsr":
-      return getJsrDependencies(dependency as Dependency<"jsr">);
-    case "npm":
-      return getNpmDependencies(dependency as Dependency<"npm">);
-  }
+  lockfile.insertPackage(
+    specifier,
+    await getJsrPackageIntegrity(identifier),
+  );
+  return await getJsrDependencies(identifier);
+}
+
+async function insertNpmPackage(
+  lockfile: Lockfile,
+  specifier: string,
+  identifier: Dependency<"npm">,
+): Promise<Dependency<"jsr" | "npm">[]> {
+  const info = await getNpmPackageInfo(identifier);
+  lockfile.insertPackage(specifier, info.integrity);
+  return Object.entries(info.dependencies).map(([name, constraint]) => ({
+    kind: "npm",
+    name,
+    constraint,
+    path: "",
+  }));
 }
 
 async function getJsrPackageIntegrity(
@@ -190,21 +209,31 @@ async function getJsrPackageIntegrity(
   return checksum(await res.arrayBuffer());
 }
 
-async function checksum(src: BufferSource): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", src);
-  const arr = Array.from(new Uint8Array(buf));
-  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
+async function getNpmPackageInfo(
+  dependency: Dependency<"npm">,
+): Promise<NpmPackageInfo> {
+  const { name, constraint: version } = dependency;
+  const res = await fetch(
+    `https://registry.npmjs.org/${name}/${version}`,
+  );
+  assertOk(res);
+  const info = match({
+    dist: {
+      integrity: _("integrity", is.String),
+    },
+    dependencies: _("dependencies", is.RecordOf(is.String, is.String)),
+  }, await res.json());
+  if (!info) {
+    throw new Error("Unexpected response from npm registry", { cause: res });
+  }
+  return info;
 }
-
-type Package<T extends "jsr" | "npm"> = T extends "jsr"
-  ? { scope: string; name: string }
-  : { scope?: string; name: string };
 
 async function getJsrDependencies(
   dependency: Dependency<"jsr">,
 ): Promise<Dependency<"jsr" | "npm">[]> {
   const { constraint: version } = dependency;
-  const { scope, name } = parseScopeAndName(dependency);
+  const { scope, name } = parsePackage(dependency);
   const res = await fetch(
     `https://api.jsr.io/scopes/${scope}/packages/${name}/versions/${version}/dependencies`,
     {
@@ -213,13 +242,18 @@ async function getJsrDependencies(
       },
     },
   );
+  assertOk(res);
   return ensure(
     await res.json(),
     is.ArrayOf(isDependency),
   ) as Dependency<"jsr" | "npm">[];
 }
 
-function parseScopeAndName<T extends "jsr" | "npm">(
+type Package<T extends "jsr" | "npm"> = T extends "jsr"
+  ? { scope: string; name: string }
+  : { scope?: string; name: string };
+
+function parsePackage<T extends "jsr" | "npm">(
   dependency: Dependency<T>,
 ): Package<T> {
   if (dependency.name.startsWith("@")) {
@@ -227,23 +261,4 @@ function parseScopeAndName<T extends "jsr" | "npm">(
     return { scope, name };
   }
   return { name: dependency } as unknown as Package<T>;
-}
-
-async function createRemoteLock(
-  dep: Dependency<"http" | "https">,
-): Promise<LockfileJson> {
-  const lockfile = parseFromJson("", {
-    version: "3",
-    remote: {},
-  });
-  const graph = await createGraph(stringify(dep));
-  const deps = graph.modules.map((mod) => mod.specifier);
-  for (const dep of deps) {
-    const res = await fetch(dep);
-    lockfile.insertRemote(
-      dep,
-      await checksum(await res.arrayBuffer()),
-    );
-  }
-  return lockfile.toJson();
 }
