@@ -14,7 +14,7 @@ import { getUpdate } from "./updates.ts";
 const VERSION =
   (await import("./deno.json", { with: { type: "json" } })).default.version;
 
-export type { Lockfile, LockfileJson };
+export type { LockfileJson };
 
 const { parseFromJson } = await instantiate();
 
@@ -77,23 +77,14 @@ async function extractRemote(
 ): Promise<LockfileJson> {
   const original = lockfile.toJson();
   const graph = await createGraph(stringify(dep));
-  const dependencies = graph.modules.map((mod) => mod.specifier);
+  const deps = graph.modules.map((mod) => mod.specifier);
   return {
     version: "3",
     remote: filterValues(
-      pick(original.remote, dependencies),
+      pick(original.remote, deps),
       (hash) => hash !== undefined,
     ),
   };
-}
-
-/**
- * Update strategy for the dependency.
- */
-export type UpdateStrategy = "auto" | "widen" | "increase" | "lock-only";
-
-export interface UpdateOptions {
-  strategy?: UpdateStrategy;
 }
 
 interface LockfileDeletion {
@@ -118,7 +109,7 @@ export function createLock(
   target: string,
 ): Promise<LockfileJson> {
   return isRemote(dependency)
-    ? createRemoteLock(dependency, target)
+    ? createRemoteLock(dependency)
     : createPackageLock(
       { ...dependency, path: "" } as Dependency<"jsr" | "npm">,
       target,
@@ -180,15 +171,6 @@ async function insertPackage(
   }
 }
 
-/**
- * Get the dependencies of the given package.
- *
- * @example
- * ```ts
- * const deps = await getDependencies(parse("jsr:@std/assert@^0.222.0"));
- * // -> ["jsr:@std/fmt@^0.222.0"]
- * ```
- */
 function getDependencies(
   dependency: Dependency<"jsr" | "npm">,
 ): Promise<Dependency<"jsr" | "npm">[]> {
@@ -205,11 +187,11 @@ async function getJsrPackageIntegrity(
 ): Promise<string> {
   const { name, constraint: version } = dependency;
   const res = await fetch(`https://jsr.io/${name}/${version}_meta.json`);
-  // Calculate the sha256 hash of the response json.
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    await res.arrayBuffer(),
-  );
+  return checksum(await res.arrayBuffer());
+}
+
+async function checksum(src: BufferSource): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", src);
   const arr = Array.from(new Uint8Array(buf));
   return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -222,7 +204,7 @@ async function getJsrDependencies(
   dependency: Dependency<"jsr">,
 ): Promise<Dependency<"jsr" | "npm">[]> {
   const { constraint: version } = dependency;
-  const { scope, name } = parsePackage(dependency);
+  const { scope, name } = parseScopeAndName(dependency);
   const res = await fetch(
     `https://api.jsr.io/scopes/${scope}/packages/${name}/versions/${version}/dependencies`,
     {
@@ -237,7 +219,7 @@ async function getJsrDependencies(
   ) as Dependency<"jsr" | "npm">[];
 }
 
-function parsePackage<T extends "jsr" | "npm">(
+function parseScopeAndName<T extends "jsr" | "npm">(
   dependency: Dependency<T>,
 ): Package<T> {
   if (dependency.name.startsWith("@")) {
@@ -248,7 +230,20 @@ function parsePackage<T extends "jsr" | "npm">(
 }
 
 async function createRemoteLock(
-  dependency: Dependency<"http" | "https">,
-  params: LockfileUpdateParams,
+  dep: Dependency<"http" | "https">,
 ): Promise<LockfileJson> {
+  const lockfile = parseFromJson("", {
+    version: "3",
+    remote: {},
+  });
+  const graph = await createGraph(stringify(dep));
+  const deps = graph.modules.map((mod) => mod.specifier);
+  for (const dep of deps) {
+    const res = await fetch(dep);
+    lockfile.insertRemote(
+      dep,
+      await checksum(await res.arrayBuffer()),
+    );
+  }
+  return lockfile.toJson();
 }

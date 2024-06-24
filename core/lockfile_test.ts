@@ -37,6 +37,7 @@ const LOCKFILE: string = `{
     "https://deno.land/x/deno_graph@0.50.0/loader.ts": "a2e757383908f4a51659fe1b1203386887ebb17756bac930a64856d613d8d57d",
     "https://deno.land/x/deno_graph@0.50.0/media_type.ts": "a89a1b38d07c160e896de9ceb99285ba8391940140558304171066b5c3ef7609",
     "https://deno.land/x/deno_graph@0.50.0/mod.ts": "47b5e8560f3e66468194742239fc76cf587d611dd43c1913eeebb9b1d94fc39f",
+    "https://deno.land/x/deno_graph@0.50.0/types.d.ts": "8f4101e79df43b526cd8d6528fb0ce1d2e719576bcb69640f92bf4f5af977fd7",
     "https://deno.land/x/dir@1.5.1/data_local_dir/mod.ts": "91eb1c4bfadfbeda30171007bac6d85aadacd43224a5ed721bbe56bc64e9eb66",
     "https://deno.land/x/wasmbuild@0.14.1/cache.ts": "89eea5f3ce6035a1164b3e655c95f21300498920575ade23161421f5b01967f4",
     "https://deno.land/x/wasmbuild@0.14.1/loader.ts": "d98d195a715f823151cbc8baa3f32127337628379a02d9eb2a3c5902dbccfc02"
@@ -142,16 +143,16 @@ describe("extract", () => {
   });
 });
 
-describe.only("createLock - package", () => {
+describe("createLock", () => {
   beforeEach(() => fs.mock());
   afterEach(() => fs.dispose());
 
-  it("should create a new partial lock for a package updated", async () => {
-    const update = await createLock(
+  it("should create a partial lock for a package with a patch update", async () => {
+    const lock = await createLock(
       parse("jsr:@std/assert@^0.222.0"),
       "0.222.1",
     );
-    assertEquals(update, {
+    assertEquals(lock, {
       version: "3",
       packages: {
         specifiers: {
@@ -177,16 +178,16 @@ describe.only("createLock - package", () => {
     });
   });
 
-  it("should create a new partial lock for a package updated", async () => {
-    const part = await createLock(
+  it("should create a partial lock for a package with a minor update", async () => {
+    const lock = await createLock(
       parse("jsr:@std/assert@^0.226.0"),
       "0.226.0",
     );
-    assertEquals(part, {
+    assertEquals(lock, {
       version: "3",
       packages: {
         specifiers: {
-          "jsr:@std/assert@^0.222.0": "jsr:@std/assert@0.226.0",
+          "jsr:@std/assert@^0.226.0": "jsr:@std/assert@0.226.0",
           "jsr:@std/internal@^1.0.0": "jsr:@std/internal@1.0.0",
         },
         jsr: {
@@ -202,7 +203,35 @@ describe.only("createLock - package", () => {
         },
       },
       remote: {},
-      workspace: { dependencies: ["jsr:@std/assert@^0.222.0"] },
+      workspace: { dependencies: ["jsr:@std/assert@^0.226.0"] },
+    });
+  });
+
+  it("should create a partial lock for a remote dependency", async () => {
+    const lock = await createLock(
+      parse("https://deno.land/x/deno_graph@0.50.0/mod.ts"),
+      "0.50.0",
+    );
+    assertEquals(lock, {
+      version: "3",
+      remote: {
+        "https://deno.land/x/deno_graph@0.50.0/deno_graph_wasm.generated.js":
+          "e1d58f79f4e33c7cc1062af565600f422a2fec1b5eaee42691f2a7992d9d5e6b",
+        "https://deno.land/x/deno_graph@0.50.0/loader.ts":
+          "a2e757383908f4a51659fe1b1203386887ebb17756bac930a64856d613d8d57d",
+        "https://deno.land/x/deno_graph@0.50.0/media_type.ts":
+          "a89a1b38d07c160e896de9ceb99285ba8391940140558304171066b5c3ef7609",
+        "https://deno.land/x/deno_graph@0.50.0/mod.ts":
+          "47b5e8560f3e66468194742239fc76cf587d611dd43c1913eeebb9b1d94fc39f",
+        "https://deno.land/x/deno_graph@0.50.0/types.d.ts":
+          "8f4101e79df43b526cd8d6528fb0ce1d2e719576bcb69640f92bf4f5af977fd7",
+        "https://deno.land/x/dir@1.5.1/data_local_dir/mod.ts":
+          "91eb1c4bfadfbeda30171007bac6d85aadacd43224a5ed721bbe56bc64e9eb66",
+        "https://deno.land/x/wasmbuild@0.14.1/cache.ts":
+          "89eea5f3ce6035a1164b3e655c95f21300498920575ade23161421f5b01967f4",
+        "https://deno.land/x/wasmbuild@0.14.1/loader.ts":
+          "d98d195a715f823151cbc8baa3f32127337628379a02d9eb2a3c5902dbccfc02",
+      },
     });
   });
 });
