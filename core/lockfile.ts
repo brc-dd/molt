@@ -1,21 +1,14 @@
 import { ensure, is } from "@core/unknownutil";
 import { createGraph } from "@deno/graph";
 import { toPath } from "@molt/lib/path";
-import { assert, assertEquals } from "@std/assert";
+import { assert } from "@std/assert";
 import { filterValues, pick } from "@std/collections";
-import * as SemVer from "@std/semver";
 import {
   instantiate,
   type Lockfile,
   type LockfileJson,
 } from "./deno_lockfile/js/mod.ts";
-import {
-  Dependency,
-  isDependency,
-  isRemote,
-  parse,
-  stringify,
-} from "./deps.ts";
+import { Dependency, isDependency, isRemote, stringify } from "./deps.ts";
 import { DependencyUpdate, getUpdate } from "./updates.ts";
 
 const VERSION =
@@ -64,7 +57,7 @@ function extractPackage(
   dependency: Dependency<"jsr" | "npm">,
   lockfile: Lockfile,
 ): LockfileJson {
-  const name = stringify(dependency, { omit: ["path"] });
+  const name = stringify(dependency, "kind", "name", "constraint");
   // We must copy the lockfile to avoid mutating the original.
   const copy = lockfile.copy();
   copy.setWorkspaceConfig({ dependencies: [name] });
@@ -121,32 +114,32 @@ interface LockfileDeletion {
   remote?: string[];
 }
 
+export interface LockfileUpdateParams {
+  increase?: string;
+  lock: string;
+}
+
 /**
  * Create a new partial lock for the given dependency updated.
  */
 export function getUpdatePart(
   lockfile: Lockfile,
   dependency: Dependency,
-  update: DependencyUpdate,
+  params: LockfileUpdateParams,
 ): Promise<UpdatePart> {
   return isRemote(dependency)
-    ? getRemoteUpdate(
-      lockfile,
-      dependency,
-      update,
-    )
+    ? getRemoteUpdate(lockfile, dependency, params)
     : getPackageUpdate(
       lockfile,
       { ...dependency, path: "" } as Dependency<"jsr" | "npm">,
-      update,
+      params,
     );
 }
 
 async function getPackageUpdate(
   lockfile: Lockfile,
   dependency: Dependency<"jsr" | "npm">,
-  update: DependencyUpdate,
-  options: UpdateOptions = {},
+  params: LockfileUpdateParams,
 ): Promise<UpdatePart> {
   assert(dependency.path === "");
   lockfile = parseFromJson(lockfile.filename, {
@@ -154,59 +147,50 @@ async function getPackageUpdate(
     remote: {},
     workspace: {
       dependencies: [
-        stringify({ ...dependency, path: "" }),
+        stringify(dependency),
       ],
     },
   });
-  const target = {
-    ...dependency,
-    constraint: update.constrainted ?? update.latest,
-  };
-  lockfile.insertPackageSpecifier(
-    stringify(dependency),
-    stringify(target),
-  );
-  await insertPackage(lockfile, target);
-
+  await insertPackage(lockfile, dependency, params);
   return { deleted: {}, updated: lockfile.toJson() };
 }
 
 async function insertPackage(
   lockfile: Lockfile,
-  root: Dependency<"jsr" | "npm">,
-): Promise<void> {
-  const name = stringify(root, { omit: ["protocol", "path"] });
-  if (root.kind === "jsr") {
+  request: Dependency<"jsr" | "npm">,
+  params: LockfileUpdateParams,
+) {
+  const identifier = {
+    ...request,
+    constraint: params.increase ?? params.lock,
+  };
+  lockfile.insertPackageSpecifier(
+    stringify(request),
+    stringify(identifier),
+  );
+  const specifier = stringify(identifier, "name", "constraint");
+  if (request.kind === "jsr") {
     lockfile.insertPackage(
-      name,
-      await getJsrPackageIntegrity(root as Dependency<"jsr">),
+      specifier,
+      await getJsrPackageIntegrity(identifier as Dependency<"jsr">),
     );
   } else {
     lockfile.insertNpmPackage(
-      name,
-      await getNpmPackageInfo(root as Dependency<"npm">),
+      specifier,
+      await getNpmPackageInfo(identifier as Dependency<"npm">),
     );
   }
-  const deps = await getDependencies(root);
+  const deps = await getDependencies(identifier);
   lockfile.addPackageDeps(
-    name,
-    deps.map((dep) => stringify({ ...dep, path: "" })),
+    specifier,
+    deps.map((dep) => stringify(dep, "kind", "name", "constraint")),
   );
-  for (let dep of deps) {
-    dep = { ...dep, path: "" };
+  for (const dep of deps) {
+    dep.path = "";
     const update = await getUpdate(dep);
-    const target = update
-      ? {
-        ...dep,
-        constraint: update.constrainted ?? update.latest,
-        path: "",
-      }
-      : dep;
-    lockfile.insertPackageSpecifier(
-      stringify(dep),
-      stringify(target),
-    );
-    await insertPackage(lockfile, target);
+    await insertPackage(lockfile, dep, {
+      lock: update?.constrainted ?? dep.constraint,
+    });
   }
 }
 
@@ -248,30 +232,10 @@ type Package<T extends "jsr" | "npm"> = T extends "jsr"
   ? { scope: string; name: string }
   : { scope?: string; name: string };
 
-/**
- * Parse the package name to the package object.
- *
- * @example
- * ```ts
- * const pkg = parsePackage("jsr:@std/testing");
- * // -> { scope: "std", name: "testing" }
- * ```
- */
-function parsePackage<T extends "jsr" | "npm">(
-  dependency: Dependency<T>,
-): Package<T> {
-  if (dependency.name.startsWith("@")) {
-    const [scope, name] = dependency.name.slice(1).split("/");
-    return { scope, name };
-  }
-  return { name: dependency } as unknown as Package<T>;
-}
-
 async function getJsrDependencies(
   dependency: Dependency<"jsr">,
 ): Promise<Dependency<"jsr" | "npm">[]> {
   const { constraint: version } = dependency;
-  assert(SemVer.parseRange(version).length === 1, "Expect an identifier");
   const { scope, name } = parsePackage(dependency);
   const res = await fetch(
     `https://api.jsr.io/scopes/${scope}/packages/${name}/versions/${version}/dependencies`,
@@ -285,6 +249,16 @@ async function getJsrDependencies(
     await res.json(),
     is.ArrayOf(isDependency),
   ) as Dependency<"jsr" | "npm">[];
+}
+
+function parsePackage<T extends "jsr" | "npm">(
+  dependency: Dependency<T>,
+): Package<T> {
+  if (dependency.name.startsWith("@")) {
+    const [scope, name] = dependency.name.slice(1).split("/");
+    return { scope, name };
+  }
+  return { name: dependency } as unknown as Package<T>;
 }
 
 async function getRemoteUpdate(

@@ -146,11 +146,6 @@ describe("extract", () => {
 describe.only("getUpdatePart - package", () => {
   let lockfile: Lockfile;
   const dependency = parse("jsr:@std/assert@^0.222.0");
-  const update: DependencyUpdate = {
-    latest: "0.224.0",
-    constrainted: "0.222.1",
-    released: "0.224.0",
-  };
 
   beforeEach(async () => {
     fs.mock();
@@ -160,8 +155,7 @@ describe.only("getUpdatePart - package", () => {
   afterEach(() => fs.dispose());
 
   it("should create a new partial lock for a package updated", async () => {
-    const part = await getUpdatePart(lockfile, dependency, update);
-    assertEquals(part.deleted, {});
+    const part = await getUpdatePart(lockfile, dependency, { lock: "0.222.1" });
     assertEquals(part.updated, {
       version: "3",
       packages: {
@@ -186,5 +180,6 @@ describe.only("getUpdatePart - package", () => {
       remote: {},
       workspace: { dependencies: ["jsr:@std/assert@^0.222.0"] },
     });
+    assertEquals(part.deleted, {});
   });
 });

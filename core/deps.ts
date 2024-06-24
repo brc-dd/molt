@@ -92,28 +92,29 @@ export interface StringifyOptions {
  * @example
  * ```ts
  * stringify({
- *   type: "remote",
+ *   kind: "https",
  *   name: "deno.land/std",
- *   version: "1.0.0",
- *   entrypoint: "/fs/mod.ts",
+ *   constraint: "1.0.0",
+ *   path: "/fs/mod.ts",
  * }); // -> "https://deno.land/std@1.0.0/fs/mod.ts"
  * ```
  */
 export function stringify(
-  dep: Dependency,
-  options: StringifyOptions = {},
+  dependency: Dependency,
+  ...comps: (keyof Dependency)[]
 ): string {
+  comps = comps.length ? comps : ["kind", "name", "constraint", "path"];
   let str = "";
-  if (!options.omit?.includes("protocol")) {
-    str += dep.kind + ":";
-    if (dep.kind.startsWith("http")) str += "//";
+  if (comps.includes("kind")) {
+    str += dependency.kind + ":";
+    if (dependency.kind.startsWith("http")) str += "//";
   }
-  str += dep.name;
-  if (!options.omit?.includes("constraint") && dep.constraint) {
-    str += `@${dep.constraint}`;
+  str += dependency.name;
+  if (comps.includes("constraint") && dependency.constraint) {
+    str += `@${dependency.constraint}`;
   }
-  if (!options.omit?.includes("path") && dep.path) {
-    str += dep.path;
+  if (comps.includes("path") && dependency.path) {
+    str += dependency.path;
   }
   return str;
 }

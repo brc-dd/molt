@@ -80,7 +80,7 @@ describe("stringify", () => {
     assertEquals(
       stringify(
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
-        { omit: ["protocol"] },
+        "name", "constraint", "path",
       ),
       "deno.land/std@0.1.0/assert/mod.ts",
     );
@@ -90,7 +90,7 @@ describe("stringify", () => {
     assertEquals(
       stringify(
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
-        { omit: ["constraint"] },
+        "kind", "name", "path",
       ),
       "https://deno.land/std/assert/mod.ts",
     );
@@ -100,7 +100,7 @@ describe("stringify", () => {
     assertEquals(
       stringify(
         parse("https://deno.land/std@0.1.0/assert/mod.ts"),
-        { omit: ["protocol", "constraint", "path"] },
+        "name",
       ),
       "deno.land/std",
     );
