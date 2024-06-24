@@ -13,12 +13,14 @@ import { Dependency, isDependency, isRemote, stringify } from "./deps.ts";
 import { assertOk, checksum } from "./internal.ts";
 import { getUpdate } from "./updates.ts";
 
-const VERSION =
-  (await import("./deno.json", { with: { type: "json" } })).default.version;
-
 export type { LockfileJson };
 
 const { parseFromJson } = await instantiate();
+
+const MOLT_VERSION =
+  (await import("./deno.json", { with: { type: "json" } })).default.version;
+
+const LOCKFILE_VERSION = "3";
 
 /**
  * Create a LockFile object from the given lock file.
@@ -62,7 +64,7 @@ async function extractRemote(
   const graph = await createGraph(stringify(dep));
   const deps = graph.modules.map((mod) => mod.specifier);
   return {
-    version: "3",
+    version: LOCKFILE_VERSION,
     remote: filterValues(
       pick(lock.remote, deps),
       (hash) => hash !== undefined,
@@ -78,7 +80,7 @@ function extractPackage(
   const lockfile = parseFromJson("", lock);
   lockfile.setWorkspaceConfig({ dependencies: [name] });
   return {
-    version: "3",
+    version: LOCKFILE_VERSION,
     ...pick(lockfile.toJson(), ["packages", "workspace"]),
     remote: {},
   };
@@ -93,7 +95,7 @@ interface LockfileDeletion {
   remote?: string[];
 }
 
-export interface LockfileUpdateParams {
+export interface CreateLockParams {
   increase?: string;
   lock: string;
 }
@@ -114,7 +116,7 @@ async function createRemoteLock(
   dep: Dependency<"http" | "https">,
 ): Promise<LockfileJson> {
   const lockfile = parseFromJson("", {
-    version: "3",
+    version: LOCKFILE_VERSION,
     remote: {},
   });
   const graph = await createGraph(stringify(dep));
@@ -133,7 +135,7 @@ async function createPackageLock(
 ): Promise<LockfileJson> {
   dependency = { ...dependency, path: "" };
   const lockfile = parseFromJson("", {
-    version: "3",
+    version: LOCKFILE_VERSION,
     remote: {},
     workspace: {
       dependencies: [
@@ -159,15 +161,15 @@ async function insertPackage(
     stringify(identifier),
   );
   const specifier = stringify(identifier, "name", "constraint");
-  const deps =
+  const dependencies =
     await (request.kind === "jsr"
       ? insertJsrPackage(lockfile, specifier, identifier as Dependency<"jsr">)
       : insertNpmPackage(lockfile, specifier, identifier as Dependency<"npm">));
   lockfile.addPackageDeps(
     specifier,
-    deps.map((dep) => stringify(dep, "kind", "name", "constraint")),
+    dependencies.map((dep) => stringify(dep, "kind", "name", "constraint")),
   );
-  for (const dep of deps) {
+  for (const dep of dependencies) {
     dep.path = "";
     const update = await getUpdate(dep);
     await insertPackage(lockfile, dep, update?.constrainted ?? dep.constraint);
@@ -238,7 +240,7 @@ async function getJsrDependencies(
     `https://api.jsr.io/scopes/${scope}/packages/${name}/versions/${version}/dependencies`,
     {
       headers: {
-        "User-Agent": `molt/${VERSION}; https://jsr.io/@molt`,
+        "User-Agent": `molt/${MOLT_VERSION}; https://jsr.io/@molt`,
       },
     },
   );
