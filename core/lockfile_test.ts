@@ -1,7 +1,7 @@
 import * as fs from "@chiezo/amber/fs";
-import { assertEquals, assertObjectMatch } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
-import { createLock, extract, readLockfile } from "./lockfile.ts";
+import { createLock, extract } from "./lockfile.ts";
 import { parse } from "./deps.ts";
 
 const LOCKFILE = `{
@@ -38,29 +38,6 @@ const LOCKFILE = `{
     ]
   }
 }`;
-
-describe("readLockfile", () => {
-  beforeEach(() => fs.mock());
-  afterEach(() => fs.dispose());
-
-  it("should read a lockfile", async () => {
-    await Deno.writeTextFile("deno.lock", LOCKFILE);
-    const lockfile = await readLockfile("deno.lock");
-    assertObjectMatch(
-      lockfile.toJson(),
-      {
-        version: "3",
-        packages: {
-          specifiers: {
-            "jsr:@std/assert@^0.222.0": "jsr:@std/assert@0.222.0",
-            "jsr:@std/fmt@^0.222.0": "jsr:@std/fmt@0.222.0",
-            "jsr:@std/testing@^0.222.0": "jsr:@std/testing@0.222.0",
-          },
-        },
-      },
-    );
-  });
-});
 
 describe("extract", () => {
   const json = JSON.parse(LOCKFILE);
@@ -189,6 +166,56 @@ describe("createLock", () => {
       },
       remote: {},
       workspace: { dependencies: ["jsr:@std/assert@^0.226.0"] },
+    });
+  });
+
+  it("should create a partial lock for a npm package", async () => {
+    const lock = await createLock(
+      parse("npm:@conventional-commits/parser@0.4.0"),
+      "0.4.0",
+    );
+    // deno-fmt-ignore-block
+    assertEquals(lock, {
+      version: "3",
+      packages: {
+        specifiers: {
+          "npm:@conventional-commits/parser@0.4.0": "npm:@conventional-commits/parser@0.4.0",
+        },
+        npm: {
+          "@conventional-commits/parser@0.4.0": {
+            integrity: "sha512-L6pniK5G37vn+VlltK3gaR3ByjwT6ZLXvy1ovVMIRivmwd6677288PTSZTS2zNGknRXetCIy/2Miov4ntCUZ+g==",
+            dependencies: {
+              "unist-util-visit": "^2.0.3",
+              "unist-util-visit-parents": "^3.1.1",
+            },
+          },
+          "@types/unist@2.0.10": {
+            integrity: "sha512-IfYcSBWE3hLpBg8+X2SEa8LVkJdJEkT2Ese2aaLs3ptGdVtABxndrMaxuFlQ1qdFf9Q5rDvDpxI3WwgvKFAsQA==",
+            dependencies: {},
+          },
+          "unist-util-is@4.1.0": {
+            integrity: "sha512-ZOQSsnce92GrxSqlnEEseX0gi7GH9zTJZ0p9dtu87WRb/37mMPO2Ilx1s/t9vBHrFhbgweUwb+t7cIn5dxPhZg==",
+            dependencies: {},
+          },
+          "unist-util-visit-parents@3.1.1": {
+            integrity: "sha512-1KROIZWo6bcMrZEwiH2UrXDyalAa0uqzWCxCJj6lPOvTve2WkfgCytoDTPaMnodXh1WrXOq0haVYHj99ynJlsg==",
+            dependencies: {
+              "@types/unist": "^2.0.0",
+              "unist-util-is": "^4.0.0",
+            },
+          },
+          "unist-util-visit@2.0.3": {
+            integrity: "sha512-iJ4/RczbJMkD0712mGktuGpm/U4By4FfDonL7N/9tATGIF4imikjOuagyMY53tnZq3NP6BcmlrHhEKAfGWjh7Q==",
+            dependencies: {
+              "@types/unist": "^2.0.0",
+              "unist-util-is": "^4.0.0",
+              "unist-util-visit-parents": "^3.0.0",
+            },
+          },
+        },
+      },
+      remote: {},
+      workspace: { dependencies: ["npm:@conventional-commits/parser@0.4.0"] },
     });
   });
 
