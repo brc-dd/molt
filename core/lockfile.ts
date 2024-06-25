@@ -111,7 +111,7 @@ async function insertJsrPackage(
     dep.path = "";
     const update = await getUpdate(dep);
     const target = update?.constrainted ?? dep.constraint;
-    await insertPackage(lock, dep, target, dep.kind === "jsr");
+    await insertPackage(lock, dep, target);
   }
 }
 
@@ -136,17 +136,17 @@ async function insertNpmPackage(
 }
 
 async function getJsrPackageIntegrity(
-  dependency: Dependency<"jsr">,
+  dep: Dependency<"jsr">,
 ): Promise<string> {
-  const { name, constraint: version } = dependency;
+  const { name, constraint: version } = dep;
   const res = await fetch(`https://jsr.io/${name}/${version}_meta.json`);
   return checksum(await res.arrayBuffer());
 }
 
 async function getNpmPackageInfo(
-  dependency: Dependency<"npm">,
+  dep: Dependency<"npm">,
 ): Promise<NpmPackageInfo> {
-  const { name, constraint: version } = dependency;
+  const { name, constraint: version } = dep;
   const res = await fetch(
     `https://registry.npmjs.org/${name}/${version}`,
   );
@@ -167,10 +167,10 @@ async function getNpmPackageInfo(
 }
 
 async function getJsrDependencies(
-  dependency: Dependency<"jsr">,
+  dep: Dependency<"jsr">,
 ): Promise<Dependency<"jsr" | "npm">[]> {
-  const { constraint: version } = dependency;
-  const [scope, name] = dependency.name.slice(1).split("/");
+  const { constraint: version } = dep;
+  const [scope, name] = dep.name.slice(1).split("/");
   const res = await fetch(
     `https://api.jsr.io/scopes/${scope}/packages/${name}/versions/${version}/dependencies`,
     {
@@ -225,9 +225,9 @@ async function extractRemote(
 
 function extractPackage(
   lock: LockfileJson,
-  dependency: Dependency<"jsr" | "npm">,
+  dep: Dependency<"jsr" | "npm">,
 ): LockfileJson {
-  const name = stringify(dependency, "kind", "name", "constraint");
+  const name = stringify(dep, "kind", "name", "constraint");
   const lockfile = parseFromJson("", lock);
   lockfile.setWorkspaceConfig({ dependencies: [name] });
   return {

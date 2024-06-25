@@ -169,43 +169,80 @@ describe("createLock", () => {
     });
   });
 
+  it("should create a partial lock for a jsr package with a npm dependency", async () => {
+    const lock = await createLock(
+      parse("jsr:@core/match@^0.2.0"),
+      "0.2.5",
+    );
+    assertEquals(lock, {
+      version: "3",
+      packages: {
+        specifiers: {
+          "jsr:@core/match@^0.2.0": "jsr:@core/match@0.2.5",
+          "npm:ts-toolbelt@9.6.0": "npm:ts-toolbelt@9.6.0",
+        },
+        jsr: {
+          "@core/match@0.2.5": {
+            integrity:
+              "55f38d482ce845958883571e543afa9da2eb89f6fe1825f38764bbd0e7585594",
+            dependencies: ["npm:ts-toolbelt@9.6.0"],
+          },
+        },
+        npm: {
+          "ts-toolbelt@9.6.0": {
+            integrity:
+              "sha512-nsZd8ZeNUzukXPlJmTBwUAuABDe/9qtVDelJeT/qW0ow3ZS3BsQJtNkan1802aM9Uf68/Y8ljw86Hu0h5IUW3w==",
+            dependencies: {},
+          },
+        },
+      },
+      remote: {},
+      workspace: { dependencies: ["jsr:@core/match@^0.2.0"] },
+    });
+  });
+
   it("should create a partial lock for a npm package", async () => {
     const lock = await createLock(
       parse("npm:@conventional-commits/parser@0.4.0"),
       "0.4.0",
     );
-    // deno-fmt-ignore-block
     assertEquals(lock, {
       version: "3",
       packages: {
         specifiers: {
-          "npm:@conventional-commits/parser@0.4.0": "npm:@conventional-commits/parser@0.4.0",
+          "npm:@conventional-commits/parser@0.4.0":
+            "npm:@conventional-commits/parser@0.4.0",
         },
         npm: {
           "@conventional-commits/parser@0.4.0": {
-            integrity: "sha512-L6pniK5G37vn+VlltK3gaR3ByjwT6ZLXvy1ovVMIRivmwd6677288PTSZTS2zNGknRXetCIy/2Miov4ntCUZ+g==",
+            integrity:
+              "sha512-L6pniK5G37vn+VlltK3gaR3ByjwT6ZLXvy1ovVMIRivmwd6677288PTSZTS2zNGknRXetCIy/2Miov4ntCUZ+g==",
             dependencies: {
               "unist-util-visit": "^2.0.3",
               "unist-util-visit-parents": "^3.1.1",
             },
           },
           "@types/unist@2.0.10": {
-            integrity: "sha512-IfYcSBWE3hLpBg8+X2SEa8LVkJdJEkT2Ese2aaLs3ptGdVtABxndrMaxuFlQ1qdFf9Q5rDvDpxI3WwgvKFAsQA==",
+            integrity:
+              "sha512-IfYcSBWE3hLpBg8+X2SEa8LVkJdJEkT2Ese2aaLs3ptGdVtABxndrMaxuFlQ1qdFf9Q5rDvDpxI3WwgvKFAsQA==",
             dependencies: {},
           },
           "unist-util-is@4.1.0": {
-            integrity: "sha512-ZOQSsnce92GrxSqlnEEseX0gi7GH9zTJZ0p9dtu87WRb/37mMPO2Ilx1s/t9vBHrFhbgweUwb+t7cIn5dxPhZg==",
+            integrity:
+              "sha512-ZOQSsnce92GrxSqlnEEseX0gi7GH9zTJZ0p9dtu87WRb/37mMPO2Ilx1s/t9vBHrFhbgweUwb+t7cIn5dxPhZg==",
             dependencies: {},
           },
           "unist-util-visit-parents@3.1.1": {
-            integrity: "sha512-1KROIZWo6bcMrZEwiH2UrXDyalAa0uqzWCxCJj6lPOvTve2WkfgCytoDTPaMnodXh1WrXOq0haVYHj99ynJlsg==",
+            integrity:
+              "sha512-1KROIZWo6bcMrZEwiH2UrXDyalAa0uqzWCxCJj6lPOvTve2WkfgCytoDTPaMnodXh1WrXOq0haVYHj99ynJlsg==",
             dependencies: {
               "@types/unist": "^2.0.0",
               "unist-util-is": "^4.0.0",
             },
           },
           "unist-util-visit@2.0.3": {
-            integrity: "sha512-iJ4/RczbJMkD0712mGktuGpm/U4By4FfDonL7N/9tATGIF4imikjOuagyMY53tnZq3NP6BcmlrHhEKAfGWjh7Q==",
+            integrity:
+              "sha512-iJ4/RczbJMkD0712mGktuGpm/U4By4FfDonL7N/9tATGIF4imikjOuagyMY53tnZq3NP6BcmlrHhEKAfGWjh7Q==",
             dependencies: {
               "@types/unist": "^2.0.0",
               "unist-util-is": "^4.0.0",
