@@ -5,47 +5,45 @@ import { createGraphLocally } from "./graph.ts";
 import { readImportMapJson } from "./import_map.ts";
 
 /** Type of the source of the dependency. */
-export type SourceType = "esm" | "import_map";
+export type SourceKind = "esm" | "import_map";
 
 /** Span of the dependency in the source code. */
 export type RangeJson = NonNullable<DependencyJson["code"]>["span"];
 
 /** Information about the source of the dependency. */
-export type DependencySource<T extends SourceType> = {
-  /** The type of the source of the dependency. */
-  type: T;
+export type DependencySource<K extends SourceKind> = {
   /** The full path to the module that imports the dependency.
    * @example "file:///path/to/mod.ts" */
-  url: string;
-} & DependencySourceLocator<T>;
+  specifier: string;
+  /** The type of the source of the dependency. */
+  kind: K;
+} & DependencySourceLocator<K>;
 
 /** Locator of the source of the dependency. */
 export type DependencySourceLocator<
-  T extends SourceType,
-> = T extends "esm" ? { span: RangeJson }
-  : T extends "import_map" ? { key: string }
+  K extends SourceKind,
+> = K extends "esm" ? { span: RangeJson }
+  : K extends "import_map" ? { key: string }
   : never;
 
 /** Representation of a reference to a dependency. */
 export interface DependencyRef<
-  T extends SourceType = SourceType,
+  K extends SourceKind = SourceKind,
 > {
-  /** The original specifier of the dependency appeared in the code. */
-  specifier: string;
   /** The parsed components of the dependency specifier. */
   dependency: Dependency;
   /** Information about the source of the dependency. */
-  source: DependencySource<T>;
+  source: DependencySource<K>;
 }
 
-export interface CollectFromModuleOptions {
+export interface FromEsModulesOptions {
   /** Whether to resolve local imports and find dependencies recursively.
    * @default true */
   recursive?: boolean;
 }
 
 const compare = (a: DependencyRef, b: DependencyRef) =>
-  a.specifier.localeCompare(b.specifier);
+  a.dependency.name.localeCompare(b.dependency.name);
 
 /**
  * Collect dependencies from the given ES module(s), sorted by name.
@@ -54,7 +52,7 @@ const compare = (a: DependencyRef, b: DependencyRef) =>
  */
 export async function collectFromEsModules(
   paths: string | URL | (string | URL)[],
-  options: CollectFromModuleOptions = {},
+  options: FromEsModulesOptions = {},
 ): Promise<DependencyRef<"esm">[]> {
   const urls = [paths].flat().map(toUrl);
   const graph = await createGraphLocally(urls, options);
@@ -78,9 +76,8 @@ function fromDependencyJson(
   const { span } = json.code ?? json.type ?? {};
   if (url && span) {
     return {
-      specifier,
       dependency: parse(specifier),
-      source: { type: "esm", url: referrer, span },
+      source: { specifier: referrer, kind: "esm", span },
     };
   }
 }
@@ -90,13 +87,12 @@ function fromDependencyJson(
 export async function collectFromImportMap(
   path: string | URL,
 ): Promise<DependencyRef<"import_map">[]> {
-  const url = toUrl(path);
+  const specifier = toUrl(path);
   const json = await readImportMapJson(path);
   return Object.entries(json.imports).map((
-    [key, specifier],
+    [key, value],
   ): DependencyRef<"import_map"> => ({
-    specifier,
-    dependency: parse(specifier),
-    source: { type: "import_map", url, key },
+    dependency: parse(value),
+    source: { specifier, kind: "import_map", key },
   })).sort(compare);
 }

@@ -7,6 +7,10 @@ export {
   tryParse,
 } from "./deps.ts";
 
-export { collectFromEsModules, collectFromImportMap } from "./refs.ts";
+export {
+  collectFromEsModules,
+  collectFromImportMap,
+  type DependencyRef,
+} from "./refs.ts";
 
 export { type DependencyUpdate, getUpdate } from "./updates.ts";

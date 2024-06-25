@@ -44,7 +44,7 @@ export function isRemote(
  * const { name, version, path } = Dependency.parse(
  *   new URL("https://deno.land/std@0.200.0/fs/mod.ts")
  * );
- * // -> { type: "remote", name: "deno.land/std", version: "0.200.0" }
+ * // -> { type: "https", name: "deno.land/std", constraint: "0.200.0" }
  */
 export function parse(specifier: string): Dependency {
   const url = new URL(specifier);
