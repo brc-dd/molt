@@ -58,88 +58,70 @@ async function createRemoteLock(
 }
 
 async function createPackageLock(
-  dependency: Dependency<"jsr" | "npm">,
+  dep: Dependency<"jsr" | "npm">,
   target: string,
 ): Promise<LockfileJson> {
-  const req = { ...dependency, path: "" };
+  const required = { ...dep, path: "" };
   const lockfile = parseFromJson("", {
     version: LOCKFILE_VERSION,
     remote: {},
     workspace: {
       dependencies: [
-        stringify(req),
+        stringify(required),
       ],
     },
   });
-  await insertPackage(lockfile, req, target);
+  await insertPackage(lockfile, required, target);
   return lockfile.toJson();
 }
 
 function insertPackage(
-  lockfile: Lockfile,
-  request: Dependency<"jsr" | "npm">,
+  lock: Lockfile,
+  required: Dependency<"jsr" | "npm">,
   target: string,
   insertSpecifier: boolean = true,
 ): Promise<void> {
-  const identifier = {
-    ...request,
-    constraint: target,
-  };
+  const locked = { ...required, constraint: target };
   if (insertSpecifier) {
-    lockfile.insertPackageSpecifier(
-      stringify(request),
-      stringify(identifier),
-    );
+    lock.insertPackageSpecifier(stringify(required), stringify(locked));
   }
-  const id = stringify(identifier, "name", "constraint");
-  if (request.kind === "jsr") {
-    return insertJsrPackage(
-      lockfile,
-      id,
-      identifier as Dependency<"jsr">,
-    );
+  const specifier = stringify(locked, "name", "constraint");
+  if (required.kind === "jsr") {
+    return insertJsrPackage(lock, specifier, locked as Dependency<"jsr">);
   } else {
-    return insertNpmPackage(
-      lockfile,
-      id,
-      identifier as Dependency<"npm">,
-    );
+    return insertNpmPackage(lock, specifier, locked as Dependency<"npm">);
   }
 }
 
 async function insertJsrPackage(
-  lockfile: Lockfile,
+  lock: Lockfile,
   specifier: string,
-  identifier: Dependency<"jsr">,
+  dependency: Dependency<"jsr">,
 ): Promise<void> {
-  lockfile.insertPackage(
+  lock.insertPackage(
     specifier,
-    await getJsrPackageIntegrity(identifier),
+    await getJsrPackageIntegrity(dependency),
   );
-  const deps = await getJsrDependencies(identifier);
-  lockfile.addPackageDeps(
+  const deps = await getJsrDependencies(dependency);
+  lock.addPackageDeps(
     specifier,
     deps.map((dep) => stringify(dep, "kind", "name", "constraint")),
   );
   for (const dep of deps) {
     dep.path = "";
     const update = await getUpdate(dep);
-    await insertPackage(
-      lockfile,
-      dep,
-      update?.constrainted ?? dep.constraint,
-      dep.kind === "jsr",
-    );
+    const target = update?.constrainted ?? dep.constraint;
+    await insertPackage(lock, dep, target, dep.kind === "jsr");
   }
 }
 
 async function insertNpmPackage(
-  lockfile: Lockfile,
+  lock: Lockfile,
   specifier: string,
-  identifier: Dependency<"npm">,
+  dependency: Dependency<"npm">,
 ): Promise<void> {
-  const info = await getNpmPackageInfo(identifier);
-  lockfile.insertNpmPackage(specifier, info);
+  const info = await getNpmPackageInfo(dependency);
+  lock.insertNpmPackage(specifier, info);
   const deps = Object.entries(info.dependencies).map(([name, constraint]) => ({
     kind: "npm",
     name,
@@ -148,12 +130,8 @@ async function insertNpmPackage(
   })) as Dependency<"npm">[];
   for (const dep of deps) {
     const update = await getUpdate(dep);
-    await insertPackage(
-      lockfile,
-      dep,
-      update?.constrainted ?? dep.constraint,
-      false,
-    );
+    const target = update?.constrainted ?? dep.constraint;
+    await insertPackage(lock, dep, target, false);
   }
 }
 
@@ -192,7 +170,7 @@ async function getJsrDependencies(
   dependency: Dependency<"jsr">,
 ): Promise<Dependency<"jsr" | "npm">[]> {
   const { constraint: version } = dependency;
-  const { scope, name } = parsePackage(dependency);
+  const [scope, name] = dependency.name.slice(1).split("/");
   const res = await fetch(
     `https://api.jsr.io/scopes/${scope}/packages/${name}/versions/${version}/dependencies`,
     {
@@ -208,25 +186,11 @@ async function getJsrDependencies(
   ) as Dependency<"jsr" | "npm">[];
 }
 
-type Package<T extends "jsr" | "npm"> = T extends "jsr"
-  ? { scope: string; name: string }
-  : { scope?: string; name: string };
-
-function parsePackage<T extends "jsr" | "npm">(
-  dependency: Dependency<T>,
-): Package<T> {
-  if (dependency.name.startsWith("@")) {
-    const [scope, name] = dependency.name.slice(1).split("/");
-    return { scope, name };
-  }
-  return { name: dependency } as unknown as Package<T>;
-}
-
 /**
  * Extract the partial lock for the given JSR or NPM package from a lockfile.
  *
- * @param name - The import requirement of the JSR or NPM package.
- * @param lock - The `Lockfile` object to extract the partial lock for the dependency from.
+ * @param lockfile The `Lockfile` object to extract the partial lock for the dependency from.
+ * @param dependency The dependency to extract the partial lock for.
  * @returns The `LockfileJson` object representing the partial lock.
  *
  * @example
@@ -236,17 +200,17 @@ function parsePackage<T extends "jsr" | "npm">(
  * ```
  */
 export async function extract(
+  lockfile: LockfileJson,
   dependency: Dependency,
-  lock: LockfileJson,
 ): Promise<LockfileJson> {
   return isRemote(dependency)
-    ? await extractRemote(dependency, lock)
-    : extractPackage(dependency as Dependency<"jsr" | "npm">, lock);
+    ? await extractRemote(lockfile, dependency)
+    : extractPackage(lockfile, dependency as Dependency<"jsr" | "npm">);
 }
 
 async function extractRemote(
-  dep: Dependency<"http" | "https">,
   lock: LockfileJson,
+  dep: Dependency<"http" | "https">,
 ): Promise<LockfileJson> {
   const graph = await createGraph(stringify(dep));
   const deps = graph.modules.map((mod) => mod.specifier);
@@ -260,8 +224,8 @@ async function extractRemote(
 }
 
 function extractPackage(
-  dependency: Dependency<"jsr" | "npm">,
   lock: LockfileJson,
+  dependency: Dependency<"jsr" | "npm">,
 ): LockfileJson {
   const name = stringify(dependency, "kind", "name", "constraint");
   const lockfile = parseFromJson("", lock);

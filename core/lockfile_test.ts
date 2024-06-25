@@ -47,8 +47,8 @@ describe("extract", () => {
 
   it("should extract the partial lock for a package from a lockfile", async () => {
     const dep = parse("jsr:@std/testing@^0.222.0");
-    const part = await extract(dep, json);
-    assertEquals(part, {
+    const lock = await extract(json, dep);
+    assertEquals(lock, {
       version: "3",
       packages: {
         specifiers: {
@@ -68,8 +68,8 @@ describe("extract", () => {
 
   it("should extract the partial lock along with the dependencies", async () => {
     const dep = parse("jsr:@std/assert@^0.222.0");
-    const part = await extract(dep, json);
-    assertEquals(part, {
+    const lock = await extract(json, dep);
+    assertEquals(lock, {
       version: "3",
       packages: {
         specifiers: {
@@ -97,8 +97,8 @@ describe("extract", () => {
 
   it("should extract the remote dependencies", async () => {
     const dep = parse("https://deno.land/std@0.220.0/assert/assert.ts");
-    const actual = await extract(dep, json);
-    assertEquals(actual, {
+    const lock = await extract(json, dep);
+    assertEquals(lock, {
       version: "3",
       remote: json.remote,
     });
