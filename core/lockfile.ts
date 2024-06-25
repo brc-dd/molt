@@ -1,13 +1,19 @@
 import { ensure, is } from "@core/unknownutil";
 import { createGraph } from "@deno/graph";
-import { filterValues, pick } from "@std/collections";
+import { filterValues, mapEntries, pick } from "@std/collections";
 import {
   instantiate,
   type Lockfile,
   type LockfileJson,
   type NpmPackageInfo,
 } from "./deno_lockfile/js/mod.ts";
-import { Dependency, isDependency, isRemote, stringify } from "./deps.ts";
+import {
+  Dependency,
+  isDependency,
+  isRemote,
+  parse,
+  stringify,
+} from "./deps.ts";
 import { assertOk, checksum } from "./internal.ts";
 import { getUpdate } from "./updates.ts";
 
@@ -122,12 +128,9 @@ async function insertNpmPackage(
 ): Promise<void> {
   const info = await getNpmPackageInfo(dependency);
   lock.insertNpmPackage(specifier, info);
-  const deps = Object.entries(info.dependencies).map(([name, constraint]) => ({
-    kind: "npm",
-    name,
-    constraint,
-    path: "",
-  })) as Dependency<"npm">[];
+  const deps = Object.values(info.dependencies).map((dep) =>
+    parse(`npm:${dep}`) as Dependency<"npm">
+  );
   for (const dep of deps) {
     const update = await getUpdate(dep);
     const target = update?.constrainted ?? dep.constraint;
@@ -162,7 +165,10 @@ async function getNpmPackageInfo(
   );
   return {
     integrity: info.dist.integrity,
-    dependencies: info.dependencies ?? {},
+    dependencies: mapEntries(
+      info.dependencies ?? {},
+      ([name, version]) => [name, `${name}@${version}`],
+    ),
   };
 }
 

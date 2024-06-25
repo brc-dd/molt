@@ -129,7 +129,9 @@ export function is(str: string, pkg: Package): boolean {
  * fromDependency(dependency); // { registry: "jsr", scope: "molt", name: "core" }
  * ```
  */
-export function fromDependency(dependency: DependencyReference): Package | undefined {
+export function fromDependency(
+  dependency: DependencyReference,
+): Package | undefined {
   const { protocol, name } = dependency;
   return tryParse(protocol + name);
 }

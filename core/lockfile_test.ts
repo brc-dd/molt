@@ -10,7 +10,8 @@ const LOCKFILE = `{
     "specifiers": {
       "jsr:@std/assert@^0.222.0": "jsr:@std/assert@0.222.0",
       "jsr:@std/fmt@^0.222.0": "jsr:@std/fmt@0.222.0",
-      "jsr:@std/testing@^0.222.0": "jsr:@std/testing@0.222.0"
+      "jsr:@std/testing@^0.222.0": "jsr:@std/testing@0.222.0",
+      "npm:debug@^4.3.0": "npm:debug@4.3.0"
     },
     "jsr": {
       "@std/assert@0.222.0": {
@@ -25,6 +26,16 @@ const LOCKFILE = `{
       "@std/testing@0.222.0": {
         "integrity": "a6d10c9fbb1df052ad7f73174d511328c08b7408bdd162ef6c3bc04def49c2ae"
       }
+    },
+    "npm": {
+      "debug@4.3.0": {
+        "integrity": "sha512-jjO6JD2rKfiZQnBoRzhRTbXjHLGLfH+UtGkWLc/UXAh/rzZMyjbgn0NcfFpqT8nd1kTtFnDiJcrIFkq4UKeJVg==",
+        "dependencies": { "ms": "ms@2.1.2" }
+      },
+      "ms@2.1.2": {
+        "integrity": "sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==",
+        "dependencies": {}
+      }
     }
   },
   "remote": {
@@ -34,7 +45,8 @@ const LOCKFILE = `{
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@^0.222.0",
-      "jsr:@std/testing@^0.222.0"
+      "jsr:@std/testing@^0.222.0",
+      "npm:debug@^4.3.0"
     ]
   }
 }`;
@@ -45,28 +57,7 @@ describe("extract", () => {
   beforeEach(() => fs.mock());
   afterEach(() => fs.dispose());
 
-  it("should extract the partial lock for a package from a lockfile", async () => {
-    const dep = parse("jsr:@std/testing@^0.222.0");
-    const lock = await extract(json, dep);
-    assertEquals(lock, {
-      version: "3",
-      packages: {
-        specifiers: {
-          "jsr:@std/testing@^0.222.0": "jsr:@std/testing@0.222.0",
-        },
-        jsr: {
-          "@std/testing@0.222.0": {
-            integrity:
-              "a6d10c9fbb1df052ad7f73174d511328c08b7408bdd162ef6c3bc04def49c2ae",
-          },
-        },
-      },
-      remote: {},
-      workspace: { dependencies: ["jsr:@std/testing@^0.222.0"] },
-    });
-  });
-
-  it("should extract the partial lock along with the dependencies", async () => {
+  it("should extract the partial lock for a jsr package from a lockfile", async () => {
     const dep = parse("jsr:@std/assert@^0.222.0");
     const lock = await extract(json, dep);
     assertEquals(lock, {
@@ -92,6 +83,31 @@ describe("extract", () => {
       },
       remote: {},
       workspace: { dependencies: ["jsr:@std/assert@^0.222.0"] },
+    });
+  });
+
+  it("should extract a npm package from a lockfile", async () => {
+    const dep = parse("npm:debug@^4.3.0");
+    const lock = await extract(json, dep);
+    assertEquals(lock, {
+      version: "3",
+      packages: {
+        specifiers: { "npm:debug@^4.3.0": "npm:debug@4.3.0" },
+        npm: {
+          "debug@4.3.0": {
+            integrity:
+              "sha512-jjO6JD2rKfiZQnBoRzhRTbXjHLGLfH+UtGkWLc/UXAh/rzZMyjbgn0NcfFpqT8nd1kTtFnDiJcrIFkq4UKeJVg==",
+            dependencies: { ms: "ms@2.1.2" },
+          },
+          "ms@2.1.2": {
+            integrity:
+              "sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==",
+            dependencies: {},
+          },
+        },
+      },
+      remote: {},
+      workspace: { dependencies: ["npm:debug@^4.3.0"] },
     });
   });
 
@@ -203,56 +219,28 @@ describe("createLock", () => {
 
   it("should create a partial lock for a npm package", async () => {
     const lock = await createLock(
-      parse("npm:@conventional-commits/parser@0.4.0"),
-      "0.4.0",
+      parse("npm:debug@^4.3.0"),
+      "4.3.5",
     );
     assertEquals(lock, {
       version: "3",
       packages: {
-        specifiers: {
-          "npm:@conventional-commits/parser@0.4.0":
-            "npm:@conventional-commits/parser@0.4.0",
-        },
+        specifiers: { "npm:debug@^4.3.0": "npm:debug@4.3.5" },
         npm: {
-          "@conventional-commits/parser@0.4.0": {
+          "debug@4.3.5": {
             integrity:
-              "sha512-L6pniK5G37vn+VlltK3gaR3ByjwT6ZLXvy1ovVMIRivmwd6677288PTSZTS2zNGknRXetCIy/2Miov4ntCUZ+g==",
-            dependencies: {
-              "unist-util-visit": "^2.0.3",
-              "unist-util-visit-parents": "^3.1.1",
-            },
+              "sha512-pt0bNEmneDIvdL1Xsd9oDQ/wrQRkXDT4AUWlNZNPKvW5x/jyO9VFXkJUP07vQ2upmw5PlaITaPKc31jK13V+jg==",
+            dependencies: { ms: "ms@2.1.2" },
           },
-          "@types/unist@2.0.10": {
+          "ms@2.1.2": {
             integrity:
-              "sha512-IfYcSBWE3hLpBg8+X2SEa8LVkJdJEkT2Ese2aaLs3ptGdVtABxndrMaxuFlQ1qdFf9Q5rDvDpxI3WwgvKFAsQA==",
+              "sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==",
             dependencies: {},
-          },
-          "unist-util-is@4.1.0": {
-            integrity:
-              "sha512-ZOQSsnce92GrxSqlnEEseX0gi7GH9zTJZ0p9dtu87WRb/37mMPO2Ilx1s/t9vBHrFhbgweUwb+t7cIn5dxPhZg==",
-            dependencies: {},
-          },
-          "unist-util-visit-parents@3.1.1": {
-            integrity:
-              "sha512-1KROIZWo6bcMrZEwiH2UrXDyalAa0uqzWCxCJj6lPOvTve2WkfgCytoDTPaMnodXh1WrXOq0haVYHj99ynJlsg==",
-            dependencies: {
-              "@types/unist": "^2.0.0",
-              "unist-util-is": "^4.0.0",
-            },
-          },
-          "unist-util-visit@2.0.3": {
-            integrity:
-              "sha512-iJ4/RczbJMkD0712mGktuGpm/U4By4FfDonL7N/9tATGIF4imikjOuagyMY53tnZq3NP6BcmlrHhEKAfGWjh7Q==",
-            dependencies: {
-              "@types/unist": "^2.0.0",
-              "unist-util-is": "^4.0.0",
-              "unist-util-visit-parents": "^3.0.0",
-            },
           },
         },
       },
       remote: {},
-      workspace: { dependencies: ["npm:@conventional-commits/parser@0.4.0"] },
+      workspace: { dependencies: ["npm:debug@^4.3.0"] },
     });
   });
 
