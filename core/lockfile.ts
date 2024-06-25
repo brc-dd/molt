@@ -1,6 +1,6 @@
 import { ensure, is } from "@core/unknownutil";
 import { createGraph } from "@deno/graph";
-import { filterValues, mapEntries, pick } from "@std/collections";
+import { deepMerge, filterValues, mapEntries, pick } from "@std/collections";
 import {
   instantiate,
   type Lockfile,
@@ -14,22 +14,14 @@ import {
   parse,
   stringify,
 } from "./deps.ts";
-import { assertOk, checksum } from "./internal.ts";
+import { assertOk, checksum, MOLT_VERSION } from "./internal.ts";
 import { getUpdate } from "./updates.ts";
 
 export type { LockfileJson };
 
 const { parseFromJson } = await instantiate();
 
-const MOLT_VERSION =
-  (await import("./deno.json", { with: { type: "json" } })).default.version;
-
 const LOCKFILE_VERSION = "3";
-
-export interface CreateLockParams {
-  increase?: string;
-  lock: string;
-}
 
 /**
  * Create a new partial lock for the given dependency updated.
@@ -243,11 +235,38 @@ function extractPackage(
   };
 }
 
-interface LockfileDeletion {
-  packages?: {
-    specifiers?: string[];
-    jsr?: string[];
-    npm?: string[];
-  };
-  remote?: string[];
+/**
+ * Update the given lockfile with the updated dependency.
+ *
+ * @param lockfile The lockfile to update.
+ * @param dependencies The all dependencies included in the lockfile.
+ * @param updated The updated dependency.
+ * @param target The target version to update the dependency to.
+ *
+ * @returns The LockfileJson object representing the updated lockfile.
+ */
+export async function update(
+  lockfile: LockfileJson,
+  dependencies: Dependency[],
+  updated: Dependency,
+  target: string,
+): Promise<LockfileJson> {
+  let result = await createLock(updated, target);
+  const locks = await Promise.all(
+    dependencies
+      .filter((dep) => !identical(dep, updated))
+      .map((dep) => extract(lockfile, dep)),
+  );
+  for (const lock of locks) {
+    // @ts-ignore Allow concrete type for `result`.
+    result = deepMerge(result, lock);
+  }
+  return result;
+}
+
+function identical(
+  a: Dependency,
+  b: Dependency,
+): boolean {
+  return a.kind === b.kind && a.name === b.name && a.path === b.path;
 }

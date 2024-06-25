@@ -1,3 +1,6 @@
+export const MOLT_VERSION =
+  (await import("./deno.json", { with: { type: "json" } })).default.version;
+
 export function assertOk(res: Response): void {
   if (!res.ok) {
     throw new Deno.errors.Http(`${res.statusText}: ${res.url}`);
