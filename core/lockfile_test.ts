@@ -3,7 +3,6 @@ import { assertEquals } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import { parse } from "./deps.ts";
 import { createLock, extract, LockfileJson, update } from "./lockfile.ts";
-import { pick } from "@std/collections";
 
 describe("createLock", () => {
   beforeEach(() => fs.mock());

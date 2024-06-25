@@ -13,6 +13,7 @@ import {
   isRemote,
   parse,
   stringify,
+  identical,
 } from "./deps.ts";
 import { assertOk, checksum, MOLT_VERSION } from "./internal.ts";
 import { getUpdate } from "./updates.ts";
@@ -262,11 +263,4 @@ export async function update(
     result = deepMerge(result, lock);
   }
   return result;
-}
-
-function identical(
-  a: Dependency,
-  b: Dependency,
-): boolean {
-  return a.kind === b.kind && a.name === b.name && a.path === b.path;
 }

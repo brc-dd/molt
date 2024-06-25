@@ -6,7 +6,10 @@ export type DependencyKind = "jsr" | "npm" | "http" | "https";
 const isKind = (kind: string): kind is DependencyKind =>
   ["jsr", "npm", "http", "https"].includes(kind);
 
-/** Parsed components of a dependency specifier. */
+/**
+ * Parsed components of a dependency specifier, being consistent with the
+ * response from the `dependencies` endpoint of the JSR registry API.
+ */
 export interface Dependency<
   K extends DependencyKind = DependencyKind,
 > {
@@ -117,4 +120,30 @@ export function stringify(
     str += dependency.path;
   }
   return str;
+}
+
+/** Compare two dependencies for identity. */
+export function identical(
+  a: Dependency,
+  b: Dependency,
+): boolean {
+  return identify(a) === identify(b);
+}
+
+/**
+ * Returns an identifier of the given dependency.
+ *
+ * @example
+ * ```ts
+ * identify(parse("https://deno.land/std@0.200.0/fs/mod.ts"));
+ * // -> "https://deno.land/std/fs/mod.ts"
+ *
+ * identify(parse("jsr:@std/fs@^0.222.0/copy"));
+ * // -> "jsr:@std/fs"
+ * ```
+ */
+export function identify(dep: Dependency): string {
+  return isRemote(dep)
+    ? stringify(dep, "kind", "name", "path")
+    : stringify(dep, "kind", "name");
 }

@@ -23,6 +23,12 @@ describe("collectFromEsModules", () => {
     assertEquals(actual, [
       {
         specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
+        dependency: {
+          kind: "https",
+          name: "deno.land/std",
+          constraint: "0.222.0",
+          path: "/bytes/copy.ts",
+        },
         source: {
           type: "esm",
           url: url("a.ts"),
@@ -34,6 +40,12 @@ describe("collectFromEsModules", () => {
       },
       {
         specifier: "jsr:@std/assert@0.222.0",
+        dependency: {
+          kind: "jsr",
+          name: "@std/assert",
+          constraint: "0.222.0",
+          path: "",
+        },
         source: {
           type: "esm",
           url: url("a.ts"),
@@ -63,6 +75,12 @@ describe("collectFromEsModules", () => {
     assertEquals(actual, [
       {
         specifier: "https://deno.land/std@0.222.0/bytes/copy.ts",
+        dependency: {
+          kind: "https",
+          name: "deno.land/std",
+          constraint: "0.222.0",
+          path: "/bytes/copy.ts",
+        },
         source: {
           type: "esm",
           url: url("b.ts"),
@@ -74,6 +92,12 @@ describe("collectFromEsModules", () => {
       },
       {
         specifier: "jsr:@std/assert@0.222.0",
+        dependency: {
+          kind: "jsr",
+          name: "@std/assert",
+          constraint: "0.222.0",
+          path: "",
+        },
         source: {
           type: "esm",
           url: url("a.ts"),
@@ -107,6 +131,12 @@ describe("collectFromEsModules", () => {
     assertEquals(actual, [
       {
         specifier: "jsr:@std/assert@^0.222.0",
+        dependency: {
+          kind: "jsr",
+          name: "@std/assert",
+          constraint: "^0.222.0",
+          path: "",
+        },
         source: {
           type: "esm",
           url: url("a.ts"),
@@ -140,6 +170,12 @@ describe("collectFromImportMap", () => {
     assertEquals(actual, [
       {
         specifier: "jsr:@std/assert@^0.222.0",
+        dependency: {
+          kind: "jsr",
+          name: "@std/assert",
+          constraint: "^0.222.0",
+          path: "",
+        },
         source: {
           type: "import_map",
           url: url("a.json"),
@@ -148,6 +184,12 @@ describe("collectFromImportMap", () => {
       },
       {
         specifier: "jsr:@std/testing@^0.222.0/bdd",
+        dependency: {
+          kind: "jsr",
+          name: "@std/testing",
+          constraint: "^0.222.0",
+          path: "/bdd",
+        },
         source: {
           type: "import_map",
           url: url("a.json"),

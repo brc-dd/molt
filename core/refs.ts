@@ -1,5 +1,6 @@
 import type { DependencyJson } from "@deno/graph/types";
 import { toUrl } from "@molt/lib/path";
+import { type Dependency, parse } from "./deps.ts";
 import { createGraphLocally } from "./graph.ts";
 import { readImportMapJson } from "./import_map.ts";
 
@@ -31,6 +32,8 @@ export interface DependencyRef<
 > {
   /** The original specifier of the dependency appeared in the code. */
   specifier: string;
+  /** The parsed components of the dependency specifier. */
+  dependency: Dependency;
   /** Information about the source of the dependency. */
   source: DependencySource<T>;
 }
@@ -76,6 +79,7 @@ function fromDependencyJson(
   if (url && span) {
     return {
       specifier,
+      dependency: parse(specifier),
       source: { type: "esm", url: referrer, span },
     };
   }
@@ -92,6 +96,7 @@ export async function collectFromImportMap(
     [key, specifier],
   ): DependencyRef<"import_map"> => ({
     specifier,
+    dependency: parse(specifier),
     source: { type: "import_map", url, key },
   })).sort(compare);
 }
