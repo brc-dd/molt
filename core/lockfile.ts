@@ -107,7 +107,7 @@ async function insertJsrPackage(
     deps.map((dep) => stringify(dep, "kind", "name", "constraint")),
   );
   for (const dep of deps) {
-    dep.path = "";
+    delete dep.path;
     const update = await getUpdate(dep);
     const target = update?.constrainted ?? dep.constraint;
     await insertPackage(lock, dep, target);

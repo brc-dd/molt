@@ -1,7 +1,6 @@
 import * as fs from "@chiezo/amber/fs";
-import { distinctBy } from "@std/collections";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
-import { parse, getUpdate, collectFromImportMap, identify } from "./mod.ts";
+import { collectFromImportMap } from "./mod.ts";
 
 const DENO_JSONC = `{
   // This is a comment
@@ -20,7 +19,7 @@ describe("@molt/core", () => {
     const refs = await collectFromImportMap("deno.jsonc");
     console.log(refs);
 
-    const deps = distinctBy(refs, (ref) => identify(ref.dependency));
+    const deps = Object.groupBy(refs, (ref) => ref.dependency.name);
     console.log(deps);
   });
 });

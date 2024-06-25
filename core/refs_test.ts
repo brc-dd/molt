@@ -44,7 +44,6 @@ describe("collectFromEsModules", () => {
           kind: "jsr",
           name: "@std/assert",
           constraint: "0.222.0",
-          path: "",
         },
         source: {
           type: "esm",
@@ -96,7 +95,6 @@ describe("collectFromEsModules", () => {
           kind: "jsr",
           name: "@std/assert",
           constraint: "0.222.0",
-          path: "",
         },
         source: {
           type: "esm",
@@ -135,7 +133,6 @@ describe("collectFromEsModules", () => {
           kind: "jsr",
           name: "@std/assert",
           constraint: "^0.222.0",
-          path: "",
         },
         source: {
           type: "esm",
@@ -174,7 +171,6 @@ describe("collectFromImportMap", () => {
           kind: "jsr",
           name: "@std/assert",
           constraint: "^0.222.0",
-          path: "",
         },
         source: {
           type: "import_map",

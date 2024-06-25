@@ -22,7 +22,6 @@ describe("parse", () => {
         kind: "npm",
         name: "hono",
         constraint: "v4.0.0",
-        path: "",
       },
     );
   });

@@ -21,8 +21,8 @@ export interface Dependency<
    * @example "0.222.1", "^0.222.0" */
   constraint: string;
   /** The entrypoint specifier of the dependency.
-   * @example "", "/fs/mod.ts" */
-  path: string;
+   * @example "/fs/mod.ts" */
+  path?: string;
 }
 
 export const isDependency = is.ObjectOf({
@@ -65,13 +65,7 @@ export function parse(specifier: string): Dependency {
     constraint: string;
     path?: string;
   };
-  return {
-    kind,
-    // jsr specifier may have a leading slash. e.g. jsr:/@std/testing^0.222.0/bdd
-    name: name.startsWith("/") ? name.slice(1) : name,
-    constraint,
-    path: path ? path : "",
-  };
+  return path ? { kind, name, constraint, path } : { kind, name, constraint };
 }
 
 /**
