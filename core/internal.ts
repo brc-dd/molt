@@ -1,5 +1,6 @@
-export const MOLT_VERSION =
-  (await import("./deno.json", { with: { type: "json" } })).default.version;
+import manifest from "./deno.json" with { type: "json" };
+
+export const MOLT_VERSION = manifest.version
 
 export function assertOk(res: Response): void {
   if (!res.ok) {

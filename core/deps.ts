@@ -116,7 +116,7 @@ export function stringify(
   return str;
 }
 
-/** Compare two dependencies for identity. */
+/** Compare two dependencies with `identify` function. */
 export function identical(
   a: Dependency,
   b: Dependency,
@@ -130,14 +130,14 @@ export function identical(
  * @example
  * ```ts
  * identify(parse("https://deno.land/std@0.200.0/fs/mod.ts"));
- * // -> "https://deno.land/std/fs/mod.ts"
+ * // -> "https://deno.land/std@0.200.0/fs/mod.ts"
  *
  * identify(parse("jsr:@std/fs@^0.222.0/copy"));
- * // -> "jsr:@std/fs"
+ * // -> "jsr:@std/fs@^0.222.0"
  * ```
  */
 export function identify(dep: Dependency): string {
   return isRemote(dep)
-    ? stringify(dep, "kind", "name", "path")
-    : stringify(dep, "kind", "name");
+    ? stringify(dep)
+    : stringify(dep, "kind", "name", "constraint");
 }

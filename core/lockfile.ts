@@ -13,7 +13,6 @@ import {
   isRemote,
   parse,
   stringify,
-  identical,
 } from "./deps.ts";
 import { assertOk, checksum, MOLT_VERSION } from "./internal.ts";
 import { getUpdate } from "./updates.ts";
@@ -240,7 +239,7 @@ function extractPackage(
  * Update the given lockfile with the updated dependency.
  *
  * @param lockfile The lockfile to update.
- * @param dependencies The all dependencies included in the lockfile.
+ * @param others The all dependencies included in the lockfile.
  * @param updated The updated dependency.
  * @param target The target version to update the dependency to.
  *
@@ -248,16 +247,12 @@ function extractPackage(
  */
 export async function update(
   lockfile: LockfileJson,
-  dependencies: Dependency[],
   updated: Dependency,
   target: string,
+  others: Dependency[],
 ): Promise<LockfileJson> {
   let result = await createLock(updated, target);
-  const locks = await Promise.all(
-    dependencies
-      .filter((dep) => !identical(dep, updated))
-      .map((dep) => extract(lockfile, dep)),
-  );
+  const locks = await Promise.all(others.map((dep) => extract(lockfile, dep)));
   for (const lock of locks) {
     // @ts-ignore Allow concrete type for `result`.
     result = deepMerge(result, lock);

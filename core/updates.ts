@@ -3,14 +3,15 @@ import { filterValues, mapNotNullish, maxWith } from "@std/collections";
 import * as SemVer from "@std/semver";
 import { type Dependency, parse, stringify } from "./deps.ts";
 import { assertOk } from "./internal.ts";
+import { assertExists } from "@std/assert";
 
 export interface DependencyUpdate {
-  /** The latest version available, including pre-releases or whatever. */
-  latest: string;
   /** The latest version that satisfies the constraint. */
-  constrainted?: string;
+  constrainted: string;
   /** The latest version that is not a pre-release */
   released?: string;
+  /** The latest version available, including pre-releases or whatever. */
+  latest: string;
 }
 
 /**
@@ -29,7 +30,7 @@ export interface DependencyUpdate {
  */
 export function getUpdate(
   dep: Dependency,
-): Promise<DependencyUpdate | undefined> {
+): Promise<DependencyUpdate> {
   return dep.kind.startsWith("http")
     ? getRemoteUpdate(dep as Dependency<"http" | "https">)
     : getPackageUpdate(dep as Dependency<"jsr" | "npm">);
@@ -37,23 +38,22 @@ export function getUpdate(
 
 async function getRemoteUpdate(
   dep: Dependency<"http" | "https">,
-): Promise<DependencyUpdate | undefined> {
+): Promise<DependencyUpdate> {
+  const constrainted = dep.constraint;
   const latest = await getRemoteLatestVersion(dep);
-  if (latest) {
-    const semver = SemVer.tryParse(latest);
-    if (semver) {
-      const released = !semver.prerelease?.length
-        ? SemVer.format(semver)
-        : undefined;
-      return { latest, released };
-    }
-    return { latest };
+  const semver = SemVer.tryParse(latest);
+  if (semver) {
+    const released = !semver.prerelease?.length
+      ? SemVer.format(semver)
+      : undefined;
+    return { constrainted, released, latest };
   }
+  return { constrainted, latest };
 }
 
 async function getRemoteLatestVersion(
   dep: Dependency<"http" | "https">,
-): Promise<string | undefined> {
+): Promise<string> {
   const url = stringify(dep, "kind", "name", "path");
   const res = await fetch(url, { method: "HEAD" });
 
@@ -62,36 +62,33 @@ async function getRemoteLatestVersion(
 
   // We expect a redirect to the latest version.
   if (!res.redirected) {
-    return;
+    return dep.constraint;
   }
   return parse(res.url).constraint;
 }
 
 async function getPackageUpdate(
   dep: Dependency<"jsr" | "npm">,
-): Promise<DependencyUpdate | undefined> {
+): Promise<DependencyUpdate> {
   const versions = await getVersions(dep);
   const semvers = mapNotNullish(versions, SemVer.tryParse);
 
   const latest = maxWith(semvers, SemVer.compare);
-  if (!latest) return;
+  assertExists(latest, `No SemVers found for ${dep.name}`);
 
   const releases = semvers.filter((it) => !it.prerelease?.length);
   const released = maxWith(releases, SemVer.compare);
 
-  if (!dep.constraint) {
-    return {
-      latest: SemVer.format(latest),
-      released: released && SemVer.format(released),
-    };
-  }
-
   const range = SemVer.tryParseRange(dep.constraint);
   const constrainted = range && SemVer.maxSatisfying(semvers, range);
+  assertExists(
+    constrainted,
+    `No version of ${dep.name} satisfies ${dep.constraint}`,
+  );
   return {
-    latest: SemVer.format(latest),
-    constrainted: constrainted && SemVer.format(constrainted),
+    constrainted: SemVer.format(constrainted),
     released: released && SemVer.format(released),
+    latest: SemVer.format(latest),
   };
 }
 

@@ -8,6 +8,7 @@ describe("getUpdate", () => {
     const dep = parse("https://deno.land/std@0.220.0/bytes/copy.ts");
     const actual = await getUpdate(dep);
     assertEquals(actual, {
+      constrainted: "0.220.0",
       latest: "0.224.0",
       released: "0.224.0",
     });
@@ -17,6 +18,7 @@ describe("getUpdate", () => {
     const dep = parse("https://deno.land/x/molt@0.17.0/mod.ts");
     const actual = await getUpdate(dep);
     assertEquals(actual, {
+      constrainted: "0.17.0",
       latest: "0.17.2",
       released: "0.17.2",
     });

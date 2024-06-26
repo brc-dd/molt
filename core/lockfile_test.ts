@@ -261,18 +261,13 @@ describe("extract", () => {
 
 describe("update", () => {
   it("should create a new lockfile with a new identifier for a jsr package", async () => {
-    const deps = [
-      parse("jsr:@std/assert@^0.222.0"),
+    const updated = parse("jsr:@std/assert@^0.222.0");
+    const others = [
       parse("jsr:@std/testing@^0.222.0"),
       parse("npm:debug@^4.3.0"),
       parse("https://deno.land/std@0.220.0/assert/assert.ts"),
     ];
-    const actual = await update(
-      LOCKFILE,
-      deps,
-      parse("jsr:@std/assert@^0.222.0"),
-      "0.222.1",
-    );
+    const actual = await update(LOCKFILE, updated, "0.222.1", others);
     assertEquals(actual.packages?.specifiers, {
       "jsr:@std/assert@^0.222.0": "jsr:@std/assert@0.222.1",
       "jsr:@std/fmt@^0.222.1": "jsr:@std/fmt@0.222.1",
@@ -300,18 +295,13 @@ describe("update", () => {
   });
 
   it("should create a new lockfile with a new requirement for a jsr package", async () => {
-    const deps = [
-      parse("jsr:@std/assert@^0.222.0"),
+    const updated = parse("jsr:@std/assert@^0.226.0");
+    const others = [
       parse("jsr:@std/testing@^0.222.0"),
       parse("npm:debug@^4.3.0"),
       parse("https://deno.land/std@0.220.0/assert/assert.ts"),
     ];
-    const actual = await update(
-      LOCKFILE,
-      deps,
-      parse("jsr:@std/assert@^0.226.0"),
-      "0.226.0",
-    );
+    const actual = await update(LOCKFILE, updated, "0.226.0", others);
     assertEquals(actual.packages?.specifiers, {
       "jsr:@std/assert@^0.226.0": "jsr:@std/assert@0.226.0",
       "jsr:@std/internal@^1.0.0": "jsr:@std/internal@1.0.0",

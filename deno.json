@@ -33,7 +33,7 @@
     "@std/fs": "jsr:@std/fs@^0.222.1",
     "@std/jsonc": "jsr:@std/jsonc@^0.222.1",
     "@std/path": "jsr:@std/path@^0.222.1",
-    "@std/semver": "jsr:@std/semver@^0.222.1",
+    "@std/semver": "jsr:@std/semver@^0.224.3",
     "@std/testing": "jsr:@std/testing@^0.222.1",
     "dedent": "npm:dedent@^1.5.3"
   },
